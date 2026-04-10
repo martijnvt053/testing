@@ -587,80 +587,97 @@
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition = null;
   let activeRecordingBlockId = null;
+  let activeNoteId = null;
+  let accumulatedText = '';
+  let shouldRestart = false;
 
   function toggleRecording(blockId) {
     if (!SpeechRecognition) {
-      alert('Spraakherkenning wordt niet ondersteund in deze browser. Gebruik Chrome of Safari.');
+      alert('Spraakherkenning wordt niet ondersteund in deze browser.\nGebruik Safari (iPhone) of Chrome (Android).');
       return;
     }
     if (activeRecordingBlockId === blockId) {
+      shouldRestart = false;
       stopRecording();
     } else {
-      if (activeRecordingBlockId) stopRecording();
+      if (activeRecordingBlockId) { shouldRestart = false; stopRecording(); }
       startRecording(blockId);
     }
   }
 
   function startRecording(blockId) {
-    recognition = new SpeechRecognition();
-    recognition.lang = 'nl-NL';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-
-    // Add a placeholder note for live preview
     const b = blocks.find(b => b.id === blockId);
     if (!b) return;
-    const noteId = uid();
-    b.notes.push({ id: noteId, text: '' });
-    save();
-    render();
 
-    activeRecordingBlockId = blockId;
-    document.getElementById(`mic-${blockId}`)?.classList.add('recording');
-    document.getElementById('rec-banner').classList.add('active');
+    // Create note only on first start (not on auto-restart)
+    if (activeRecordingBlockId !== blockId) {
+      activeNoteId = uid();
+      accumulatedText = '';
+      b.notes.push({ id: activeNoteId, text: '' });
+      save();
+      render();
+      activeRecordingBlockId = blockId;
+      document.getElementById(`mic-${blockId}`)?.classList.add('recording');
+      document.getElementById('rec-banner').classList.add('active');
+    }
 
-    let finalText = '';
+    recognition = new SpeechRecognition();
+    recognition.lang = 'nl-NL';
+    recognition.continuous = false;   // false = betere iOS ondersteuning
+    recognition.interimResults = true;
 
     recognition.onresult = (e) => {
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const t = e.results[i][0].transcript;
         if (e.results[i].isFinal) {
-          finalText += t + ' ';
+          accumulatedText += t + ' ';
         } else {
           interim = t;
         }
       }
-      // Update the live note
-      const n = b.notes.find(n => n.id === noteId);
+      const n = b.notes.find(n => n.id === activeNoteId);
       if (n) {
-        n.text = (finalText + interim).trim();
+        n.text = (accumulatedText + interim).trim();
         save();
-        // Update just the textarea without full re-render
         const ta = document.querySelector(`[data-block="${blockId}"] textarea:last-of-type`);
         if (ta) { ta.value = n.text; autoResize(ta); }
       }
     };
 
     recognition.onerror = (e) => {
-      if (e.error !== 'aborted') alert('Fout bij opname: ' + e.error);
+      // 'no-speech' is normaal bij een pauze — gewoon herstarten
+      if (e.error === 'no-speech' || e.error === 'aborted') return;
+      alert('Microfoon fout: ' + e.error + '\nZorg dat je toestemming hebt gegeven.');
+      shouldRestart = false;
       stopRecording();
     };
 
     recognition.onend = () => {
-      if (activeRecordingBlockId === blockId) stopRecording();
+      // Herstart automatisch als we nog aan het opnemen zijn (iOS stopt na elke zin)
+      if (activeRecordingBlockId === blockId && shouldRestart) {
+        try { recognition.start(); } catch(err) { stopRecording(); }
+      }
     };
 
-    recognition.start();
+    shouldRestart = true;
+    try {
+      recognition.start();
+    } catch(err) {
+      alert('Kon microfoon niet starten. Probeer opnieuw.');
+      stopRecording();
+    }
   }
 
   function stopRecording() {
-    if (recognition) { try { recognition.stop(); } catch(e) {} recognition = null; }
+    shouldRestart = false;
+    if (recognition) { try { recognition.abort(); } catch(e) {} recognition = null; }
     if (activeRecordingBlockId) {
       document.getElementById(`mic-${activeRecordingBlockId}`)?.classList.remove('recording');
     }
     document.getElementById('rec-banner').classList.remove('active');
     activeRecordingBlockId = null;
+    activeNoteId = null;
     render();
   }
 
