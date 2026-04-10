@@ -244,9 +244,10 @@
       font-weight: 600;
       cursor: pointer;
     }
+    .btn-download { background: var(--success); color: white; }
     .btn-copy { background: var(--accent); color: white; }
     .btn-close { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
-    .btn-copy:active, .btn-close:active { opacity: 0.7; }
+    .btn-download:active, .btn-copy:active, .btn-close:active { opacity: 0.7; }
     .copy-ok { color: var(--success); font-size: 12px; text-align: center; margin-top: 8px; display: none; }
 
     /* Drag hint */
@@ -280,7 +281,8 @@
     <pre id="export-text"></pre>
     <p class="copy-ok" id="copy-ok">✓ Gekopieerd naar klembord!</p>
     <div class="sheet-actions">
-      <button class="btn-copy" onclick="copyExport()">Kopieer tekst</button>
+      <button class="btn-download" onclick="downloadMd()">↓ Download .md</button>
+      <button class="btn-copy" onclick="copyExport()">Kopieer</button>
       <button class="btn-close" onclick="closeExport()">Sluiten</button>
     </div>
   </div>
@@ -466,27 +468,45 @@
   }
 
   // ─── Export ──────────────────────────────────────────────────────────────
-  function openExport() {
+  function buildMarkdown() {
     const date = new Date().toLocaleDateString('nl-NL', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-    let txt = `SEMINAR AANTEKENINGEN — Ben Tichelaar MBA\n${date}\n`;
-    txt += '═'.repeat(50) + '\n\n';
+    let md = `# Seminar Aantekeningen — Ben Tichelaar MBA\n`;
+    md += `**${date}**\n\n`;
+    md += '---\n\n';
 
     blocks.forEach((b, i) => {
-      txt += `${i + 1}. ${b.title || '(naamloos blok)'}\n`;
-      txt += '─'.repeat(40) + '\n';
+      md += `## ${i + 1}. ${b.title || '(naamloos blok)'}\n\n`;
       if (b.notes.length === 0) {
-        txt += '  (geen aantekeningen)\n';
+        md += '_geen aantekeningen_\n\n';
       } else {
         b.notes.forEach(n => {
-          txt += `  • ${n.text || ''}\n`;
+          md += `- ${n.text || ''}\n`;
         });
+        md += '\n';
       }
-      txt += '\n';
     });
 
-    document.getElementById('export-text').textContent = txt;
+    return md;
+  }
+
+  function openExport() {
+    document.getElementById('export-text').textContent = buildMarkdown();
     document.getElementById('copy-ok').style.display = 'none';
     document.getElementById('export-overlay').classList.add('open');
+  }
+
+  function downloadMd() {
+    const md = buildMarkdown();
+    const date = new Date().toISOString().slice(0, 10);
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `seminar-aantekeningen-${date}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   function closeExport() {
