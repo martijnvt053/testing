@@ -17,6 +17,8 @@
       --muted: #718096;
       --danger: #e53e3e;
       --success: #38a169;
+      --gold: #b7791f;
+      --gold-light: #fefcbf;
     }
 
     body {
@@ -27,24 +29,50 @@
       padding-bottom: 80px;
     }
 
+    /* Recording banner */
+    .rec-banner {
+      display: none;
+      background: var(--danger);
+      color: white;
+      text-align: center;
+      font-size: 13px;
+      padding: 7px;
+      font-weight: 600;
+    }
+    .rec-banner.active { display: block; }
+
     /* Header */
     header {
       background: var(--accent);
       color: white;
-      padding: 16px 20px;
+      padding: 14px 16px;
       position: sticky;
       top: 0;
       z-index: 100;
       box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-    header h1 { font-size: 18px; font-weight: 700; }
-    header p { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+    header h1 { font-size: 17px; font-weight: 700; }
+    header p { font-size: 11px; opacity: 0.8; margin-top: 2px; }
+    .header-settings {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      font-size: 20px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .header-settings:active { background: rgba(255,255,255,0.3); }
 
     /* Toolbar */
     .toolbar {
       display: flex;
       gap: 8px;
-      padding: 12px 16px;
+      padding: 10px 14px;
       background: white;
       border-bottom: 1px solid var(--border);
       overflow-x: auto;
@@ -59,7 +87,7 @@
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       color: var(--text);
     }
     .toolbar button.primary {
@@ -70,7 +98,7 @@
     .toolbar button:active { opacity: 0.7; }
 
     /* Blocks */
-    .blocks { padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; }
+    .blocks { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
 
     .block {
       background: var(--card);
@@ -79,29 +107,34 @@
       overflow: hidden;
       box-shadow: 0 1px 4px rgba(0,0,0,0.05);
     }
+    .block.done { border-color: var(--success); }
 
     .block-header {
       display: flex;
       align-items: center;
-      padding: 14px 16px;
+      padding: 12px 14px;
       background: var(--accent-light);
       border-bottom: 1px solid var(--border);
       gap: 8px;
       cursor: pointer;
     }
+    .block.done .block-header { background: #f0fff4; }
+
     .block-number {
       background: var(--accent);
       color: white;
-      width: 26px;
-      height: 26px;
+      width: 24px;
+      height: 24px;
       border-radius: 50%;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
     }
+    .block.done .block-number { background: var(--success); }
+
     .block-title-input {
       flex: 1;
       border: none;
@@ -114,21 +147,26 @@
     }
     .block-title-input::placeholder { color: var(--muted); font-weight: 400; }
 
-    .block-actions { display: flex; gap: 4px; }
+    .block-actions { display: flex; gap: 2px; flex-shrink: 0; }
     .icon-btn {
       background: none;
       border: none;
-      padding: 6px;
+      padding: 5px 7px;
       cursor: pointer;
       border-radius: 6px;
       color: var(--muted);
-      font-size: 16px;
+      font-size: 15px;
       line-height: 1;
       display: flex;
       align-items: center;
     }
     .icon-btn:active { background: rgba(0,0,0,0.07); }
     .icon-btn.delete { color: var(--danger); }
+    .icon-btn.finish {
+      color: var(--success);
+      font-size: 18px;
+    }
+    .icon-btn.finish.loading { opacity: 0.4; pointer-events: none; }
 
     .block-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
     .block-body.collapsed { display: none; }
@@ -139,17 +177,11 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 10px 12px;
-      position: relative;
       display: flex;
       gap: 8px;
       align-items: flex-start;
     }
-    .note-bullet {
-      color: var(--accent);
-      font-size: 18px;
-      line-height: 1.3;
-      flex-shrink: 0;
-    }
+    .note-bullet { color: var(--accent); font-size: 18px; line-height: 1.3; flex-shrink: 0; }
     .note textarea {
       flex: 1;
       border: none;
@@ -159,7 +191,7 @@
       color: var(--text);
       resize: none;
       outline: none;
-      min-height: 40px;
+      min-height: 38px;
       font-family: inherit;
       overflow: hidden;
     }
@@ -172,15 +204,53 @@
       padding: 0 2px;
       line-height: 1;
       flex-shrink: 0;
-      align-self: flex-start;
     }
     .note-del:active { color: var(--danger); }
 
-    /* Add note button */
-    .block-footer {
-      display: flex;
-      gap: 8px;
+    /* Summary box */
+    .summary-box {
+      background: var(--gold-light);
+      border: 1px solid #f6e05e;
+      border-radius: 8px;
+      padding: 12px 14px;
     }
+    .summary-box .summary-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .summary-box .summary-text {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #744210;
+      white-space: pre-wrap;
+    }
+    .summary-loading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      padding: 10px 0;
+    }
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Block footer */
+    .block-footer { display: flex; gap: 8px; }
     .add-note-btn {
       flex: 1;
       padding: 9px;
@@ -196,8 +266,6 @@
       gap: 6px;
     }
     .add-note-btn:active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
-
-    /* Mic button */
     .mic-btn {
       padding: 9px 14px;
       border: 1.5px dashed var(--border);
@@ -208,43 +276,22 @@
       cursor: pointer;
       display: flex;
       align-items: center;
-      justify-content: center;
     }
-    .mic-btn:active { background: #fff0f0; border-color: var(--danger); }
+    .mic-btn:active { background: #fff0f0; }
     .mic-btn.recording {
       background: #fff0f0;
       border-color: var(--danger);
       color: var(--danger);
       animation: pulse 1s infinite;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    /* Recording banner */
-    .rec-banner {
-      display: none;
-      background: var(--danger);
-      color: white;
-      text-align: center;
-      font-size: 13px;
-      padding: 6px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-    }
-    .rec-banner.active { display: block; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
 
     /* Empty state */
-    .empty {
-      text-align: center;
-      padding: 48px 20px;
-      color: var(--muted);
-    }
+    .empty { text-align: center; padding: 48px 20px; color: var(--muted); }
     .empty .emoji { font-size: 48px; margin-bottom: 12px; }
     .empty p { font-size: 14px; }
 
-    /* Export modal */
+    /* Overlays */
     .overlay {
       display: none;
       position: fixed;
@@ -263,7 +310,7 @@
       padding: 20px;
       overflow-y: auto;
     }
-    .sheet h2 { font-size: 16px; margin-bottom: 12px; }
+    .sheet h2 { font-size: 16px; margin-bottom: 14px; }
     .sheet pre {
       background: var(--bg);
       border: 1px solid var(--border);
@@ -278,13 +325,8 @@
     }
     .sheet-actions { display: flex; gap: 8px; margin-top: 14px; }
     .sheet-actions button {
-      flex: 1;
-      padding: 12px;
-      border-radius: 10px;
-      border: none;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
+      flex: 1; padding: 12px; border-radius: 10px; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer;
     }
     .btn-download { background: var(--success); color: white; }
     .btn-copy { background: var(--accent); color: white; }
@@ -292,42 +334,96 @@
     .btn-download:active, .btn-copy:active, .btn-close:active { opacity: 0.7; }
     .copy-ok { color: var(--success); font-size: 12px; text-align: center; margin-top: 8px; display: none; }
 
-    /* Drag hint */
-    .drag-hint {
-      font-size: 11px;
-      color: var(--muted);
-      text-align: center;
-      padding: 6px;
+    /* Settings */
+    .settings-group { margin-bottom: 16px; }
+    .settings-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
     }
+    .settings-group input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      font-family: monospace;
+    }
+    .settings-group input:focus { border-color: var(--accent); }
+    .settings-hint {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 5px;
+      line-height: 1.5;
+    }
+    .settings-save {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .settings-save:active { opacity: 0.8; }
+    .settings-ok { color: var(--success); font-size: 13px; text-align: center; margin-top: 8px; display: none; }
   </style>
 </head>
 <body>
 
-<div class="rec-banner" id="rec-banner">🔴 Opname bezig... tik op microfoon om te stoppen</div>
+<div class="rec-banner" id="rec-banner">🔴 Opname bezig… tik op 🎙️ om te stoppen</div>
 <header>
-  <h1>📓 Seminar Aantekeningen</h1>
-  <p id="header-date">Ben Tichelaar MBA</p>
+  <div>
+    <h1>📓 Seminar Aantekeningen</h1>
+    <p id="header-date">Ben Tichelaar MBA</p>
+  </div>
+  <button class="header-settings" onclick="openSettings()" title="Instellingen">⚙️</button>
 </header>
 
 <div class="toolbar">
   <button class="primary" onclick="addBlock()">＋ Nieuw blok</button>
-  <button onclick="collapseAll()">▲ Alles inklappen</button>
-  <button onclick="expandAll()">▼ Alles uitklappen</button>
+  <button onclick="collapseAll()">▲ Inklappen</button>
+  <button onclick="expandAll()">▼ Uitklappen</button>
   <button onclick="openExport()">↗ Exporteer</button>
 </div>
 
 <div class="blocks" id="blocks"></div>
 
+<!-- Export sheet -->
 <div class="overlay" id="export-overlay" onclick="closeExportIfOutside(event)">
   <div class="sheet">
     <h2>📋 Exporteer aantekeningen</h2>
     <pre id="export-text"></pre>
-    <p class="copy-ok" id="copy-ok">✓ Gekopieerd naar klembord!</p>
+    <p class="copy-ok" id="copy-ok">✓ Gekopieerd!</p>
     <div class="sheet-actions">
-      <button class="btn-download" onclick="downloadMd()">↓ Download .md</button>
+      <button class="btn-download" onclick="downloadMd()">↓ .md</button>
       <button class="btn-copy" onclick="copyExport()">Kopieer</button>
       <button class="btn-close" onclick="closeExport()">Sluiten</button>
     </div>
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="overlay" id="settings-overlay" onclick="closeSettingsIfOutside(event)">
+  <div class="sheet">
+    <h2>⚙️ Instellingen</h2>
+    <div class="settings-group">
+      <label>Anthropic API sleutel</label>
+      <input type="password" id="api-key-input" placeholder="sk-ant-…" autocomplete="off" />
+      <p class="settings-hint">
+        Nodig voor automatische samenvattingen.<br>
+        Haal op via <strong>console.anthropic.com</strong> → API Keys.<br>
+        Wordt alleen lokaal opgeslagen op dit apparaat.
+      </p>
+    </div>
+    <button class="settings-save" onclick="saveSettings()">Opslaan</button>
+    <p class="settings-ok" id="settings-ok">✓ Opgeslagen!</p>
   </div>
 </div>
 
@@ -340,13 +436,12 @@
     if (saved) {
       blocks = JSON.parse(saved);
     } else {
-      // Default starter blocks
       blocks = [
-        { id: uid(), title: 'Introductie', notes: [], collapsed: false },
-        { id: uid(), title: 'Ochtend sessie', notes: [], collapsed: false },
-        { id: uid(), title: 'Middag sessie', notes: [], collapsed: false },
-        { id: uid(), title: 'Key takeaways', notes: [], collapsed: false },
-        { id: uid(), title: 'Actiepunten', notes: [], collapsed: false },
+        { id: uid(), title: 'Introductie',    notes: [], summary: null, collapsed: false },
+        { id: uid(), title: 'Ochtend sessie', notes: [], summary: null, collapsed: false },
+        { id: uid(), title: 'Middag sessie',  notes: [], summary: null, collapsed: false },
+        { id: uid(), title: 'Key takeaways',  notes: [], summary: null, collapsed: false },
+        { id: uid(), title: 'Actiepunten',    notes: [], summary: null, collapsed: false },
       ];
       save();
     }
@@ -363,11 +458,10 @@
 
   // ─── Blocks ──────────────────────────────────────────────────────────────
   function addBlock() {
-    const block = { id: uid(), title: '', notes: [], collapsed: false };
+    const block = { id: uid(), title: '', notes: [], summary: null, collapsed: false };
     blocks.push(block);
     save();
     render();
-    // Focus the new block's title
     setTimeout(() => {
       const inputs = document.querySelectorAll('.block-title-input');
       if (inputs.length) inputs[inputs.length - 1].focus();
@@ -394,29 +488,19 @@
     save();
   }
 
-  function collapseAll() {
-    blocks.forEach(b => b.collapsed = true);
-    save();
-    render();
-  }
-
-  function expandAll() {
-    blocks.forEach(b => b.collapsed = false);
-    save();
-    render();
-  }
+  function collapseAll() { blocks.forEach(b => b.collapsed = true); save(); render(); }
+  function expandAll()   { blocks.forEach(b => b.collapsed = false); save(); render(); }
 
   // ─── Notes ───────────────────────────────────────────────────────────────
   function addNote(blockId) {
     const b = blocks.find(b => b.id === blockId);
     if (!b) return;
-    const note = { id: uid(), text: '' };
-    b.notes.push(note);
+    b.notes.push({ id: uid(), text: '' });
     save();
     render();
     setTimeout(() => {
-      const textareas = document.querySelectorAll(`[data-block="${blockId}"] textarea`);
-      if (textareas.length) textareas[textareas.length - 1].focus();
+      const tas = document.querySelectorAll(`[data-block="${blockId}"] textarea`);
+      if (tas.length) tas[tas.length - 1].focus();
     }, 50);
   }
 
@@ -440,6 +524,75 @@
     ta.style.height = ta.scrollHeight + 'px';
   }
 
+  function handleNoteKey(e, blockId, noteId) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      addNote(blockId);
+    }
+  }
+
+  // ─── Finish block / AI summary ────────────────────────────────────────────
+  async function finishBlock(blockId) {
+    const b = blocks.find(b => b.id === blockId);
+    if (!b) return;
+
+    const apiKey = localStorage.getItem('seminar-api-key');
+    if (!apiKey) {
+      alert('Voer eerst een Anthropic API sleutel in via ⚙️ instellingen (rechts bovenaan).');
+      openSettings();
+      return;
+    }
+
+    const noteTexts = b.notes.map(n => n.text).filter(t => t.trim());
+    if (noteTexts.length === 0) {
+      alert('Geen aantekeningen om samen te vatten.');
+      return;
+    }
+
+    // Show loading spinner
+    b.summary = '__loading__';
+    render();
+
+    const prompt = `Je bent een assistent die seminar-aantekeningen samenvat.
+Onderwerp: "${b.title || 'onbekend'}"
+
+Aantekeningen:
+${noteTexts.map((t, i) => `${i + 1}. ${t}`).join('\n')}
+
+Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints. Begin elk punt met "• ". Gebruik geen headers. Wees concreet en actiegericht.`;
+
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 400,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${resp.status}`);
+      }
+
+      const data = await resp.json();
+      b.summary = data.content?.[0]?.text?.trim() || '(geen samenvatting)';
+    } catch (err) {
+      b.summary = null;
+      alert('Fout bij ophalen samenvatting:\n' + err.message);
+    }
+
+    save();
+    render();
+  }
+
   // ─── Render ──────────────────────────────────────────────────────────────
   function render() {
     const container = document.getElementById('blocks');
@@ -452,23 +605,43 @@
       return;
     }
 
-    container.innerHTML = blocks.map((b, i) => `
-      <div class="block" data-block="${b.id}">
+    container.innerHTML = blocks.map((b, i) => {
+      const isDone = b.summary && b.summary !== '__loading__';
+      const isLoading = b.summary === '__loading__';
+
+      let summaryHtml = '';
+      if (isLoading) {
+        summaryHtml = `<div class="summary-loading"><div class="spinner"></div> Samenvatting maken…</div>`;
+      } else if (isDone) {
+        summaryHtml = `
+          <div class="summary-box">
+            <div class="summary-label">✨ Samenvatting</div>
+            <div class="summary-text">${escHtml(b.summary)}</div>
+          </div>`;
+      }
+
+      return `
+      <div class="block ${isDone ? 'done' : ''}" data-block="${b.id}">
         <div class="block-header" onclick="toggleBlock('${b.id}')">
-          <div class="block-number">${i + 1}</div>
+          <div class="block-number">${isDone ? '✓' : i + 1}</div>
           <input
             class="block-title-input"
             type="text"
-            placeholder="Onderwerp naam..."
+            placeholder="Onderwerp naam…"
             value="${escHtml(b.title)}"
             onclick="event.stopPropagation()"
             oninput="updateTitle('${b.id}', this.value)"
           />
           <div class="block-actions" onclick="event.stopPropagation()">
+            <button class="icon-btn finish ${isLoading ? 'loading' : ''}"
+              onclick="finishBlock('${b.id}')"
+              title="${isDone ? 'Opnieuw samenvatten' : 'Blok afronden & samenvatten'}">
+              ${isLoading ? '⏳' : (isDone ? '↺' : '✅')}
+            </button>
             <button class="icon-btn" onclick="toggleBlock('${b.id}')" title="In/uitklappen">
               ${b.collapsed ? '▼' : '▲'}
             </button>
-            <button class="icon-btn delete" onclick="deleteBlock('${b.id}')" title="Verwijder blok">✕</button>
+            <button class="icon-btn delete" onclick="deleteBlock('${b.id}')" title="Verwijder">✕</button>
           </div>
         </div>
         <div class="block-body ${b.collapsed ? 'collapsed' : ''}">
@@ -476,59 +649,53 @@
             <div class="note">
               <span class="note-bullet">•</span>
               <textarea
-                placeholder="Schrijf hier je aantekening..."
+                placeholder="Schrijf hier je aantekening…"
                 oninput="updateNote('${b.id}', '${n.id}', this.value); autoResize(this)"
                 onfocus="autoResize(this)"
                 onkeydown="handleNoteKey(event, '${b.id}', '${n.id}')"
               >${escHtml(n.text)}</textarea>
-              <button class="note-del" onclick="deleteNote('${b.id}', '${n.id}')" title="Verwijder">✕</button>
+              <button class="note-del" onclick="deleteNote('${b.id}', '${n.id}')">✕</button>
             </div>
           `).join('')}
+          ${summaryHtml}
           <div class="block-footer">
-            <button class="add-note-btn" onclick="addNote('${b.id}')">
-              ＋ Aantekening toevoegen
-            </button>
-            <button class="mic-btn" id="mic-${b.id}" onclick="toggleRecording('${b.id}')" title="Opnemen met microfoon">🎙️</button>
+            <button class="add-note-btn" onclick="addNote('${b.id}')">＋ Aantekening</button>
+            <button class="mic-btn" id="mic-${b.id}" onclick="toggleRecording('${b.id}')" title="Opnemen">🎙️</button>
           </div>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
 
-    // Restore textarea heights
     document.querySelectorAll('.note textarea').forEach(ta => {
       ta.style.height = 'auto';
       ta.style.height = ta.scrollHeight + 'px';
     });
+
+    // Restore recording button state
+    if (activeRecordingBlockId) {
+      document.getElementById(`mic-${activeRecordingBlockId}`)?.classList.add('recording');
+    }
   }
 
   function escHtml(s) {
     return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // Enter key creates new note in same block
-  function handleNoteKey(e, blockId, noteId) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      addNote(blockId);
-    }
-  }
-
   // ─── Export ──────────────────────────────────────────────────────────────
   function buildMarkdown() {
     const date = new Date().toLocaleDateString('nl-NL', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-    let md = `# Seminar Aantekeningen — Ben Tichelaar MBA\n`;
-    md += `**${date}**\n\n`;
-    md += '---\n\n';
+    let md = `# Seminar Aantekeningen — Ben Tichelaar MBA\n**${date}**\n\n---\n\n`;
 
     blocks.forEach((b, i) => {
       md += `## ${i + 1}. ${b.title || '(naamloos blok)'}\n\n`;
       if (b.notes.length === 0) {
         md += '_geen aantekeningen_\n\n';
       } else {
-        b.notes.forEach(n => {
-          md += `- ${n.text || ''}\n`;
-        });
+        b.notes.forEach(n => { md += `- ${n.text || ''}\n`; });
         md += '\n';
+      }
+      if (b.summary && b.summary !== '__loading__') {
+        md += `### Samenvatting\n\n${b.summary}\n\n`;
       }
     });
 
@@ -540,47 +707,51 @@
     document.getElementById('copy-ok').style.display = 'none';
     document.getElementById('export-overlay').classList.add('open');
   }
+  function closeExport() { document.getElementById('export-overlay').classList.remove('open'); }
+  function closeExportIfOutside(e) { if (e.target.id === 'export-overlay') closeExport(); }
 
   function downloadMd() {
-    const md = buildMarkdown();
-    const date = new Date().toISOString().slice(0, 10);
-    const blob = new Blob([md], { type: 'text/markdown' });
+    const blob = new Blob([buildMarkdown()], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `seminar-aantekeningen-${date}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  function closeExport() {
-    document.getElementById('export-overlay').classList.remove('open');
-  }
-
-  function closeExportIfOutside(e) {
-    if (e.target === document.getElementById('export-overlay')) closeExport();
+    a.download = `seminar-${new Date().toISOString().slice(0,10)}.md`;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
   }
 
   function copyExport() {
     const text = document.getElementById('export-text').textContent;
-    navigator.clipboard.writeText(text).then(() => {
-      const ok = document.getElementById('copy-ok');
-      ok.style.display = 'block';
-      setTimeout(() => ok.style.display = 'none', 2500);
-    }).catch(() => {
-      // Fallback
+    const ok = document.getElementById('copy-ok');
+    navigator.clipboard.writeText(text).catch(() => {
       const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
+      ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy');
       document.body.removeChild(ta);
-      const ok = document.getElementById('copy-ok');
+    }).finally(() => {
       ok.style.display = 'block';
       setTimeout(() => ok.style.display = 'none', 2500);
     });
+  }
+
+  // ─── Settings ─────────────────────────────────────────────────────────────
+  function openSettings() {
+    const key = localStorage.getItem('seminar-api-key') || '';
+    document.getElementById('api-key-input').value = key ? '••••••••' + key.slice(-4) : '';
+    document.getElementById('settings-ok').style.display = 'none';
+    document.getElementById('settings-overlay').classList.add('open');
+  }
+  function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); }
+  function closeSettingsIfOutside(e) { if (e.target.id === 'settings-overlay') closeSettings(); }
+
+  function saveSettings() {
+    const val = document.getElementById('api-key-input').value.trim();
+    if (val && !val.startsWith('••••')) {
+      localStorage.setItem('seminar-api-key', val);
+    }
+    const ok = document.getElementById('settings-ok');
+    ok.style.display = 'block';
+    setTimeout(() => { ok.style.display = 'none'; closeSettings(); }, 1200);
   }
 
   // ─── Speech recognition ──────────────────────────────────────────────────
@@ -593,7 +764,7 @@
 
   function toggleRecording(blockId) {
     if (!SpeechRecognition) {
-      alert('Spraakherkenning wordt niet ondersteund in deze browser.\nGebruik Safari (iPhone) of Chrome (Android).');
+      alert('Spraakherkenning niet ondersteund.\nGebruik Safari (iPhone) of Chrome (Android).');
       return;
     }
     if (activeRecordingBlockId === blockId) {
@@ -609,7 +780,6 @@
     const b = blocks.find(b => b.id === blockId);
     if (!b) return;
 
-    // Create note only on first start (not on auto-restart)
     if (activeRecordingBlockId !== blockId) {
       activeNoteId = uid();
       accumulatedText = '';
@@ -623,18 +793,15 @@
 
     recognition = new SpeechRecognition();
     recognition.lang = 'nl-NL';
-    recognition.continuous = false;   // false = betere iOS ondersteuning
+    recognition.continuous = false;
     recognition.interimResults = true;
 
     recognition.onresult = (e) => {
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const t = e.results[i][0].transcript;
-        if (e.results[i].isFinal) {
-          accumulatedText += t + ' ';
-        } else {
-          interim = t;
-        }
+        if (e.results[i].isFinal) accumulatedText += t + ' ';
+        else interim = t;
       }
       const n = b.notes.find(n => n.id === activeNoteId);
       if (n) {
@@ -646,27 +813,21 @@
     };
 
     recognition.onerror = (e) => {
-      // 'no-speech' is normaal bij een pauze — gewoon herstarten
       if (e.error === 'no-speech' || e.error === 'aborted') return;
-      alert('Microfoon fout: ' + e.error + '\nZorg dat je toestemming hebt gegeven.');
+      alert('Microfoon fout: ' + e.error);
       shouldRestart = false;
       stopRecording();
     };
 
     recognition.onend = () => {
-      // Herstart automatisch als we nog aan het opnemen zijn (iOS stopt na elke zin)
       if (activeRecordingBlockId === blockId && shouldRestart) {
         try { recognition.start(); } catch(err) { stopRecording(); }
       }
     };
 
     shouldRestart = true;
-    try {
-      recognition.start();
-    } catch(err) {
-      alert('Kon microfoon niet starten. Probeer opnieuw.');
-      stopRecording();
-    }
+    try { recognition.start(); }
+    catch(err) { alert('Kon microfoon niet starten.'); stopRecording(); }
   }
 
   function stopRecording() {
@@ -681,11 +842,9 @@
     render();
   }
 
-  // ─── Date in header ──────────────────────────────────────────────────────
+  // ─── Init ─────────────────────────────────────────────────────────────────
   const today = new Date().toLocaleDateString('nl-NL', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   document.getElementById('header-date').textContent = `Ben Tichelaar MBA — ${today}`;
-
-  // ─── Init ─────────────────────────────────────────────────────────────────
   load();
 </script>
 </body>
