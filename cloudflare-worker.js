@@ -6,8 +6,8 @@
  * 2. Plak deze code, klik Deploy
  * 3. Ga naar de worker → Settings → Variables:
  *    - ADMIN_KEY   = zelf te kiezen wachtwoord (bijv. "seminar2024")
- *    - VAPID_PUB   = BNP__rx43zkGmdtX7HCc6f3U0Cx8e0vwxRNqrawuGPpJZporDj2hUtUBQ4Y4sHa14vAAD-NJslma2D3I8brmy_Q
- *    - VAPID_PRIV  = IJ3XVUujDqBXaGtGFKhnSMsQ-SKI3Nmz4ScMG9655V8
+ *    - VAPID_PUB   = BDuanFLTbpWrUdysn2CYIfiy0pqk2NU1BCOmwLJ0xVjHCmMTi45JQDxeAguFIdcwcEqqELyuozmg1w1WdVSx8j0
+ *    - VAPID_PRIV  = pavZg9M7A617XKposwc2b8U7TAwEqzT0TDnV9gg8gvk
  * 4. Ga naar Workers → KV → Create namespace:
  *    - naam: SUBS  → bind aan worker als "SUBS"
  *    - naam: MSG   → bind aan worker als "MSG"
