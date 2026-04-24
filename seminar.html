@@ -70,6 +70,76 @@
       flex-shrink: 0;
     }
 
+    /* iOS install modal */
+    .ios-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 300;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .ios-modal-overlay.show { display: flex; }
+    .ios-modal {
+      background: white;
+      border-radius: 20px 20px 0 0;
+      padding: 24px 20px 36px;
+      width: 100%;
+      max-width: 480px;
+      position: relative;
+    }
+    .ios-modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; text-align: center; }
+    .ios-modal .ios-sub { font-size: 13px; color: #718096; text-align: center; margin-bottom: 20px; }
+    .ios-modal .ios-steps { list-style: none; display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
+    .ios-modal .ios-steps li {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .ios-modal .ios-steps .step-num {
+      background: #1a56db;
+      color: white;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    .ios-modal .ios-steps .step-icon {
+      font-size: 22px;
+      width: 36px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .ios-modal .ios-close-btn {
+      width: 100%;
+      padding: 14px;
+      background: #f5f7fa;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #1a202c;
+      cursor: pointer;
+    }
+    .ios-modal .ios-arrow {
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 8px;
+      animation: bounce 1.2s infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(6px); }
+    }
+
     /* Notification toast */
     .notif-toast {
       display: none;
@@ -454,6 +524,32 @@
   <p id="install-msg"></p>
   <button class="ib-btn" id="install-btn" onclick="triggerInstall()">Installeer</button>
   <button class="ib-close" onclick="dismissInstall()">×</button>
+</div>
+
+<div class="ios-modal-overlay" id="ios-modal-overlay" onclick="closeIOSModal(event)">
+  <div class="ios-modal">
+    <h3>Zet op beginscherm</h3>
+    <p class="ios-sub">Zo ontvang je meldingen van de trainer</p>
+    <ol class="ios-steps">
+      <li>
+        <span class="step-num">1</span>
+        <span>Tik op het <strong>deel-icoon</strong> onderaan in Safari</span>
+        <span class="step-icon">⬆️</span>
+      </li>
+      <li>
+        <span class="step-num">2</span>
+        <span>Scroll omlaag en tik <strong>"Zet op beginscherm"</strong></span>
+        <span class="step-icon">📲</span>
+      </li>
+      <li>
+        <span class="step-num">3</span>
+        <span>Tik rechtsboven op <strong>"Voeg toe"</strong> en open de app daarna vanaf je beginscherm</span>
+        <span class="step-icon">✅</span>
+      </li>
+    </ol>
+    <div class="ios-arrow">↓</div>
+    <button class="ios-close-btn" onclick="closeIOSModal()">Begrepen</button>
+  </div>
 </div>
 
 <div class="notif-toast" id="notif-toast">
@@ -970,20 +1066,29 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     const msg = document.getElementById('install-msg');
     const btn = document.getElementById('install-btn');
     if (isIOS) {
-      msg.textContent = 'Voeg toe aan je beginscherm voor meldingen. Tik op Delen → "Zet op beginscherm".';
-      btn.style.display = 'none';
+      msg.textContent = 'Installeer de app voor meldingen van de trainer.';
+      btn.textContent = 'Installeer';
+      btn.style.display = '';
     } else {
       msg.textContent = 'Installeer de app voor pushmeldingen van de trainer.';
+      btn.textContent = 'Installeer';
       btn.style.display = '';
     }
     banner.classList.add('show');
   }
 
   function triggerInstall() {
-    if (deferredInstallPrompt) {
+    if (isIOS) {
+      document.getElementById('ios-modal-overlay').classList.add('show');
+    } else if (deferredInstallPrompt) {
       deferredInstallPrompt.prompt();
       deferredInstallPrompt.userChoice.then(() => { deferredInstallPrompt = null; });
     }
+  }
+
+  function closeIOSModal(e) {
+    if (e && e.target !== document.getElementById('ios-modal-overlay')) return;
+    document.getElementById('ios-modal-overlay').classList.remove('show');
   }
 
   function dismissInstall() {
