@@ -1,4 +1,4 @@
-const CACHE = 'seminar-v3';
+const CACHE = 'seminar-v4';
 const CONFIG = 'seminar-config';
 
 self.addEventListener('install', e => {
@@ -29,32 +29,19 @@ self.addEventListener('fetch', e => {
 
 // ─── Push notification ────────────────────────────────────────────────────
 self.addEventListener('push', e => {
-  e.waitUntil(showPush());
+  const message = e.data?.text() || 'Nieuw bericht van de trainer';
+  e.waitUntil(
+    self.registration.showNotification('📓 Seminar', {
+      body: message,
+      icon: '/testing/icon.svg',
+      badge: '/testing/icon.svg',
+      vibrate: [200, 100, 200],
+      tag: 'seminar-msg',
+      renotify: true,
+      data: { url: '/testing/seminar.html' },
+    })
+  );
 });
-
-async function showPush() {
-  let message = 'Nieuw bericht van de trainer';
-  try {
-    const cfg = await caches.open(CONFIG);
-    const resp = await cfg.match('/worker-url');
-    if (resp) {
-      const workerUrl = await resp.text();
-      const r = await fetch(`${workerUrl}/message`, { cache: 'no-store' });
-      const d = await r.json();
-      if (d.message) message = d.message;
-    }
-  } catch (_) {}
-
-  return self.registration.showNotification('📓 Seminar', {
-    body: message,
-    icon: '/testing/icon.svg',
-    badge: '/testing/icon.svg',
-    vibrate: [200, 100, 200],
-    tag: 'seminar-msg',
-    renotify: true,
-    data: { url: '/testing/seminar.html' },
-  });
-}
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
