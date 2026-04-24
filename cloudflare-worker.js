@@ -192,13 +192,19 @@ async function hmac(key, data) {
 // ─── VAPID JWT ────────────────────────────────────────────────────────────────
 
 async function createVapidJwt(audience, env) {
-  const pubBytes = b64urlDecode(env.VAPID_PUB);
-  const x = b64url(pubBytes.slice(1, 33));
-  const y = b64url(pubBytes.slice(33, 65));
+  const privBytes = b64urlDecode(env.VAPID_PRIV);
+
+  // PKCS#8 wrapper for a raw P-256 private scalar (avoids JWK x/y validation)
+  const pkcs8Prefix = new Uint8Array([
+    0x30, 0x41, 0x02, 0x01, 0x00, 0x30, 0x13,
+    0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,
+    0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07,
+    0x04, 0x27, 0x30, 0x25, 0x02, 0x01, 0x01, 0x04, 0x20,
+  ]);
 
   const key = await crypto.subtle.importKey(
-    'jwk',
-    { kty: 'EC', crv: 'P-256', d: env.VAPID_PRIV, x, y, ext: true },
+    'pkcs8',
+    concat(pkcs8Prefix, privBytes),
     { name: 'ECDSA', namedCurve: 'P-256' },
     false,
     ['sign']
