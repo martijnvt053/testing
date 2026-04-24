@@ -57,34 +57,43 @@ async function handleGetMessage(env) {
 }
 
 async function handleNotify(request, env) {
-  const auth = request.headers.get('Authorization') || '';
-  if (auth !== `Bearer ${env.ADMIN_KEY}`) {
-    return new Response('Unauthorized', { status: 401, headers: CORS });
+  try {
+    const auth = request.headers.get('Authorization') || '';
+    if (auth !== `Bearer ${env.ADMIN_KEY}`) {
+      return new Response('Unauthorized', { status: 401, headers: CORS });
+    }
+
+    const { message } = await request.json();
+    await env.MSG.put('latest', message);
+
+    const { keys } = await env.SUBS.list();
+    let sent = 0;
+    const errors = [];
+
+    await Promise.allSettled(
+      keys.map(async ({ name }) => {
+        const raw = await env.SUBS.get(name);
+        if (!raw) return;
+        let sub;
+        try {
+          sub = JSON.parse(raw);
+          await sendPush(sub, message, env);
+          sent++;
+        } catch (e) {
+          errors.push(`[${sub?.endpoint?.slice(-20) ?? name}] ${e.message}`);
+        }
+      })
+    );
+
+    return new Response(JSON.stringify({ sent, failed: errors.length, errors }), {
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: e.message }), {
+      status: 500,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
   }
-
-  const { message } = await request.json();
-  await env.MSG.put('latest', message);
-
-  const { keys } = await env.SUBS.list();
-  let sent = 0;
-  const errors = [];
-
-  await Promise.allSettled(
-    keys.map(async ({ name }) => {
-      const raw = await env.SUBS.get(name);
-      if (!raw) return;
-      try {
-        await sendPush(JSON.parse(raw), message, env);
-        sent++;
-      } catch (e) {
-        errors.push(e.message);
-      }
-    })
-  );
-
-  return new Response(JSON.stringify({ sent, failed: errors.length, errors }), {
-    headers: { ...CORS, 'Content-Type': 'application/json' },
-  });
 }
 
 // ─── Web Push (RFC 8291 + RFC 8188 encrypted payload) ────────────────────────
