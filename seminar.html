@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#1a56db">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Seminar">
+  <link rel="manifest" href="/testing/manifest.json">
+  <link rel="apple-touch-icon" href="/testing/icon.svg">
   <title>Seminar Aantekeningen</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -416,13 +422,18 @@
     <div class="settings-group">
       <label>Anthropic API sleutel</label>
       <input type="password" id="api-key-input" placeholder="sk-ant-…" autocomplete="off" />
-      <p class="settings-hint">
-        Nodig voor automatische samenvattingen.<br>
-        Haal op via <strong>console.anthropic.com</strong> → API Keys.<br>
-        Wordt alleen lokaal opgeslagen op dit apparaat.
-      </p>
+      <p class="settings-hint">Nodig voor samenvattingen. Via <strong>console.anthropic.com</strong> → API Keys.</p>
+    </div>
+    <div class="settings-group">
+      <label>Cloudflare Worker URL</label>
+      <input type="url" id="worker-url-input" placeholder="https://seminar-push.jouw-naam.workers.dev" autocomplete="off" />
+      <p class="settings-hint">Nodig voor push notificaties. Zie <strong>cloudflare-worker.js</strong> voor instructies.</p>
     </div>
     <button class="settings-save" onclick="saveSettings()">Opslaan</button>
+    <div id="push-section" style="margin-top:14px; display:none;">
+      <button class="settings-save" style="background:var(--success);" onclick="subscribePush()">🔔 Push notificaties inschakelen</button>
+      <p id="push-status" style="font-size:12px; color:var(--muted); margin-top:6px; text-align:center;"></p>
+    </div>
     <p class="settings-ok" id="settings-ok">✓ Opgeslagen!</p>
   </div>
 </div>
@@ -738,20 +749,30 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
   function openSettings() {
     const key = localStorage.getItem('seminar-api-key') || '';
     document.getElementById('api-key-input').value = key ? '••••••••' + key.slice(-4) : '';
+    document.getElementById('worker-url-input').value = localStorage.getItem('seminar-worker-url') || '';
     document.getElementById('settings-ok').style.display = 'none';
+    document.getElementById('push-status').textContent = '';
+    document.getElementById('push-status').style.color = 'var(--muted)';
+    updatePushSection();
     document.getElementById('settings-overlay').classList.add('open');
   }
   function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); }
   function closeSettingsIfOutside(e) { if (e.target.id === 'settings-overlay') closeSettings(); }
 
   function saveSettings() {
-    const val = document.getElementById('api-key-input').value.trim();
-    if (val && !val.startsWith('••••')) {
-      localStorage.setItem('seminar-api-key', val);
+    const apiKey = document.getElementById('api-key-input').value.trim();
+    if (apiKey && !apiKey.startsWith('••••')) {
+      localStorage.setItem('seminar-api-key', apiKey);
     }
+    const workerUrl = document.getElementById('worker-url-input').value.trim().replace(/\/$/, '');
+    if (workerUrl) {
+      localStorage.setItem('seminar-worker-url', workerUrl);
+      sendWorkerUrlToSW(workerUrl);
+    }
+    updatePushSection();
     const ok = document.getElementById('settings-ok');
     ok.style.display = 'block';
-    setTimeout(() => { ok.style.display = 'none'; closeSettings(); }, 1200);
+    setTimeout(() => ok.style.display = 'none', 1500);
   }
 
   // ─── Speech recognition ──────────────────────────────────────────────────
@@ -842,9 +863,73 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     render();
   }
 
+  // ─── PWA & Push ──────────────────────────────────────────────────────────
+  const VAPID_PUBLIC = 'BNP__rx43zkGmdtX7HCc6f3U0Cx8e0vwxRNqrawuGPpJZporDj2hUtUBQ4Y4sHa14vAAD-NJslma2D3I8brmy_Q';
+  let swReg = null;
+
+  async function initPWA() {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+      swReg = await navigator.serviceWorker.register('/testing/sw.js', { scope: '/testing/' });
+      // Send worker URL to service worker if set
+      const workerUrl = localStorage.getItem('seminar-worker-url');
+      if (workerUrl) sendWorkerUrlToSW(workerUrl);
+    } catch (e) {
+      console.warn('SW registration failed:', e);
+    }
+  }
+
+  function sendWorkerUrlToSW(url) {
+    navigator.serviceWorker.ready.then(reg => {
+      reg.active?.postMessage({ type: 'SET_WORKER_URL', url });
+    });
+  }
+
+  async function subscribePush() {
+    const statusEl = document.getElementById('push-status');
+    const workerUrl = localStorage.getItem('seminar-worker-url');
+    if (!workerUrl) { statusEl.textContent = 'Sla eerst de Worker URL op.'; return; }
+
+    try {
+      statusEl.textContent = 'Toestemming vragen…';
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { statusEl.textContent = 'Toestemming geweigerd.'; return; }
+
+      statusEl.textContent = 'Inschrijven…';
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8(VAPID_PUBLIC),
+      });
+
+      await fetch(`${workerUrl}/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub),
+      });
+
+      statusEl.textContent = '✓ Push notificaties ingeschakeld!';
+      statusEl.style.color = 'var(--success)';
+    } catch (err) {
+      statusEl.textContent = 'Fout: ' + err.message;
+    }
+  }
+
+  function urlB64ToUint8(b64) {
+    const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
+    const raw = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+  }
+
+  function updatePushSection() {
+    const workerUrl = localStorage.getItem('seminar-worker-url');
+    document.getElementById('push-section').style.display = workerUrl ? 'block' : 'none';
+  }
+
   // ─── Init ─────────────────────────────────────────────────────────────────
   const today = new Date().toLocaleDateString('nl-NL', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   document.getElementById('header-date').textContent = `Ben Tichelaar MBA — ${today}`;
+  initPWA();
   load();
 </script>
 </body>

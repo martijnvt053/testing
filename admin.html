@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seminar Beheerportaal</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f7fa;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    h1 { font-size: 20px; color: #1a202c; margin-bottom: 4px; }
+    .sub { font-size: 13px; color: #718096; margin-bottom: 24px; }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a202c;
+      margin-bottom: 6px;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 11px 13px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      margin-bottom: 16px;
+      color: #1a202c;
+    }
+    input:focus, textarea:focus { border-color: #1a56db; }
+    textarea { resize: vertical; min-height: 100px; }
+
+    .send-btn {
+      width: 100%;
+      padding: 14px;
+      background: #1a56db;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .send-btn:active { opacity: 0.8; }
+    .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .result {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      display: none;
+    }
+    .result.ok { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
+    .result.err { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
+
+    .divider { border: none; border-top: 1px solid #e2e8f0; margin: 20px 0; }
+
+    .config-toggle {
+      background: none;
+      border: none;
+      color: #718096;
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+      margin-bottom: 16px;
+    }
+    .config-section { display: none; }
+    .config-section.open { display: block; }
+    .config-hint { font-size: 11px; color: #718096; margin-top: -12px; margin-bottom: 14px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>📣 Beheerportaal</h1>
+  <p class="sub">Stuur een pushbericht naar alle deelnemers</p>
+
+  <label>Bericht</label>
+  <textarea id="message" placeholder="Typ hier je bericht voor de deelnemers…"></textarea>
+
+  <button class="send-btn" id="send-btn" onclick="sendNotification()">
+    Verstuur push notificatie
+  </button>
+
+  <div class="result" id="result"></div>
+
+  <hr class="divider">
+
+  <button class="config-toggle" onclick="toggleConfig()">⚙️ Instellingen</button>
+  <div class="config-section" id="config-section">
+    <label>Cloudflare Worker URL</label>
+    <input type="url" id="worker-url" placeholder="https://seminar-push.naam.workers.dev" />
+
+    <label>Admin sleutel</label>
+    <input type="password" id="admin-key" placeholder="Je ADMIN_KEY uit Cloudflare" />
+    <p class="config-hint">Deze worden alleen lokaal opgeslagen in je browser.</p>
+
+    <button class="send-btn" style="background:#38a169;" onclick="saveConfig()">Opslaan</button>
+  </div>
+</div>
+
+<script>
+  function load() {
+    document.getElementById('worker-url').value = localStorage.getItem('admin-worker-url') || '';
+    document.getElementById('admin-key').value = localStorage.getItem('admin-key') || '';
+  }
+
+  function saveConfig() {
+    localStorage.setItem('admin-worker-url', document.getElementById('worker-url').value.trim().replace(/\/$/, ''));
+    localStorage.setItem('admin-key', document.getElementById('admin-key').value.trim());
+    toggleConfig();
+    showResult('✓ Instellingen opgeslagen', true);
+  }
+
+  function toggleConfig() {
+    document.getElementById('config-section').classList.toggle('open');
+  }
+
+  async function sendNotification() {
+    const message = document.getElementById('message').value.trim();
+    const workerUrl = localStorage.getItem('admin-worker-url');
+    const adminKey = localStorage.getItem('admin-key');
+
+    if (!message) { showResult('Vul een bericht in.', false); return; }
+    if (!workerUrl || !adminKey) {
+      showResult('Open eerst de instellingen en vul de Worker URL en admin sleutel in.', false);
+      document.getElementById('config-section').classList.add('open');
+      return;
+    }
+
+    const btn = document.getElementById('send-btn');
+    btn.disabled = true;
+    btn.textContent = 'Versturen…';
+
+    try {
+      const resp = await fetch(`${workerUrl}/notify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminKey}`,
+        },
+        body: JSON.stringify({ message }),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`${resp.status}: ${text}`);
+      }
+
+      const data = await resp.json();
+      showResult(`✓ Verstuurd naar ${data.sent} deelnemer${data.sent !== 1 ? 's' : ''}${data.failed ? ` (${data.failed} mislukt)` : ''}.`, true);
+      document.getElementById('message').value = '';
+    } catch (err) {
+      showResult('Fout: ' + err.message, false);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Verstuur push notificatie';
+    }
+  }
+
+  function showResult(msg, ok) {
+    const el = document.getElementById('result');
+    el.textContent = msg;
+    el.className = 'result ' + (ok ? 'ok' : 'err');
+    el.style.display = 'block';
+    if (ok) setTimeout(() => el.style.display = 'none', 4000);
+  }
+
+  load();
+</script>
+</body>
+</html>
