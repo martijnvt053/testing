@@ -72,6 +72,7 @@
     }
     .result.ok { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
     .result.err { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
+    .result { white-space: pre-wrap; word-break: break-all; }
 
     .divider { border: none; border-top: 1px solid #e2e8f0; margin: 20px 0; }
 
@@ -169,8 +170,10 @@
       }
 
       const data = await resp.json();
-      showResult(`✓ Verstuurd naar ${data.sent} deelnemer${data.sent !== 1 ? 's' : ''}${data.failed ? ` (${data.failed} mislukt)` : ''}.`, true);
-      document.getElementById('message').value = '';
+      let msg = `✓ Verstuurd naar ${data.sent} deelnemer${data.sent !== 1 ? 's' : ''}`;
+      if (data.errors?.length) msg += `\nMislukt (${data.errors.length}): ${data.errors.join(' | ')}`;
+      showResult(msg, data.sent > 0 || !data.errors?.length);
+      if (data.sent > 0) document.getElementById('message').value = '';
     } catch (err) {
       showResult('Fout: ' + err.message, false);
     } finally {

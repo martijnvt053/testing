@@ -66,7 +66,8 @@ async function handleNotify(request, env) {
   await env.MSG.put('latest', message);
 
   const { keys } = await env.SUBS.list();
-  let sent = 0, failed = 0;
+  let sent = 0;
+  const errors = [];
 
   await Promise.allSettled(
     keys.map(async ({ name }) => {
@@ -75,13 +76,13 @@ async function handleNotify(request, env) {
       try {
         await sendPush(JSON.parse(raw), message, env);
         sent++;
-      } catch (_) {
-        failed++;
+      } catch (e) {
+        errors.push(e.message);
       }
     })
   );
 
-  return new Response(JSON.stringify({ sent, failed }), {
+  return new Response(JSON.stringify({ sent, failed: errors.length, errors }), {
     headers: { ...CORS, 'Content-Type': 'application/json' },
   });
 }
@@ -111,7 +112,8 @@ async function sendPush(subscription, message, env) {
   const res = await fetch(endpoint, { method: 'POST', headers, body });
 
   if (!res.ok && res.status !== 201) {
-    throw new Error(`Push HTTP ${res.status}`);
+    const body = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status}: ${body}`);
   }
 }
 
