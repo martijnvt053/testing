@@ -890,6 +890,15 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     const workerUrl = localStorage.getItem('seminar-worker-url');
     if (!workerUrl) { statusEl.textContent = 'Sla eerst de Worker URL op.'; return; }
 
+    if (typeof Notification === 'undefined' || !('pushManager' in (await navigator.serviceWorker.ready))) {
+      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      statusEl.style.color = 'var(--warning, #d97706)';
+      statusEl.textContent = isIOS
+        ? 'Op iPhone/iPad: tik op Delen → "Zet op beginscherm", open de app daarna vanaf je thuisscherm.'
+        : 'Push notificaties worden niet ondersteund in deze browser.';
+      return;
+    }
+
     try {
       statusEl.textContent = 'Toestemming vragen…';
       const perm = await Notification.requestPermission();
