@@ -1382,7 +1382,8 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
       img: `data:${scanImageMime};base64,${scanImageBase64}`,
       text: extractedText, structured,
     };
-    saveScanHistory(scanEntry);
+    // Sla geen volledige afbeelding op in localStorage (te groot) — gebruik lege placeholder
+    saveScanHistory({ ...scanEntry, img: '' });
     renderScanHistory();
 
     const workerUrl = localStorage.getItem('seminar-worker-url');
@@ -1642,9 +1643,17 @@ JSON:
 
   // Scan history (localStorage)
   function saveScanHistory(entry) {
-    const history = getScanHistory();
-    history.unshift(entry);
-    localStorage.setItem('scan-history', JSON.stringify(history.slice(0, 20)));
+    try {
+      const history = getScanHistory();
+      history.unshift(entry);
+      localStorage.setItem('scan-history', JSON.stringify(history.slice(0, 20)));
+    } catch (e) {
+      // localStorage vol — wis geschiedenis en sla alleen deze scan op
+      try {
+        localStorage.removeItem('scan-history');
+        localStorage.setItem('scan-history', JSON.stringify([entry]));
+      } catch (_) {}
+    }
   }
 
   function getScanHistory() {
