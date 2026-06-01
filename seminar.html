@@ -574,10 +574,10 @@
       background: #000;
     }
 
-    .scan-actions { display: flex; gap: 8px; margin-bottom: 14px; }
+    .scan-actions { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
     .scan-btn {
-      flex: 1; padding: 12px; border-radius: 10px; border: none;
-      font-size: 14px; font-weight: 600; cursor: pointer;
+      flex: 1; min-width: 80px; padding: 11px 8px; border-radius: 10px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer;
     }
     .scan-btn.primary { background: var(--accent); color: white; }
     .scan-btn.secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
@@ -725,6 +725,7 @@
     <div class="scan-actions" id="scan-actions" style="display:none">
       <button class="scan-btn secondary" onclick="resetScan()">✕ Wis</button>
       <button class="scan-btn primary" id="scan-ai-btn" onclick="analyzeScan()">✨ AI (Claude)</button>
+      <button class="scan-btn secondary" id="scan-azure-btn" onclick="analyzeScanAzure()" style="background:#0078d4;color:white;border:none;">🔷 Azure</button>
       <button class="scan-btn secondary" id="scan-ocr-btn" onclick="analyzeScanOCR()">📄 OCR gratis</button>
     </div>
 
@@ -797,6 +798,13 @@
       <label>Cloudflare Worker URL</label>
       <input type="url" id="worker-url-input" placeholder="https://seminar-push.jouw-naam.workers.dev" autocomplete="off" />
       <p class="settings-hint">Nodig voor push notificaties en document scans.</p>
+    </div>
+    <div class="settings-group">
+      <label>Azure Vision Endpoint URL</label>
+      <input type="url" id="azure-endpoint-input" placeholder="https://seminar-vision.cognitiveservices.azure.com/" autocomplete="off" />
+      <label style="margin-top:8px;">Azure Vision Sleutel</label>
+      <input type="password" id="azure-key-input" placeholder="Jouw Azure API sleutel" autocomplete="off" />
+      <p class="settings-hint">Via Azure Portal → jouw Computer Vision resource → Keys and Endpoint.</p>
     </div>
     <button class="settings-save" onclick="saveSettings()">Opslaan</button>
     <div id="push-section" style="margin-top:14px; display:none;">
@@ -1126,6 +1134,9 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     const key = localStorage.getItem('seminar-api-key') || '';
     document.getElementById('api-key-input').value = key ? '••••••••' + key.slice(-4) : '';
     document.getElementById('worker-url-input').value = localStorage.getItem('seminar-worker-url') || '';
+    const azKey = localStorage.getItem('seminar-azure-key') || '';
+    document.getElementById('azure-key-input').value = azKey ? '••••••••' + azKey.slice(-4) : '';
+    document.getElementById('azure-endpoint-input').value = localStorage.getItem('seminar-azure-endpoint') || '';
     document.getElementById('settings-ok').style.display = 'none';
     document.getElementById('push-status').textContent = '';
     updatePushSection();
@@ -1136,14 +1147,17 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
 
   function saveSettings() {
     const apiKey = document.getElementById('api-key-input').value.trim();
-    if (apiKey && !apiKey.startsWith('••••')) {
-      localStorage.setItem('seminar-api-key', apiKey);
-    }
+    if (apiKey && !apiKey.startsWith('••••')) localStorage.setItem('seminar-api-key', apiKey);
+
     const workerUrl = document.getElementById('worker-url-input').value.trim().replace(/\/$/, '');
-    if (workerUrl) {
-      localStorage.setItem('seminar-worker-url', workerUrl);
-      sendWorkerUrlToSW(workerUrl);
-    }
+    if (workerUrl) { localStorage.setItem('seminar-worker-url', workerUrl); sendWorkerUrlToSW(workerUrl); }
+
+    const azureEndpoint = document.getElementById('azure-endpoint-input').value.trim().replace(/\/$/, '');
+    if (azureEndpoint) localStorage.setItem('seminar-azure-endpoint', azureEndpoint);
+
+    const azureKey = document.getElementById('azure-key-input').value.trim();
+    if (azureKey && !azureKey.startsWith('••••')) localStorage.setItem('seminar-azure-key', azureKey);
+
     updatePushSection();
     const ok = document.getElementById('settings-ok');
     ok.style.display = 'block';
@@ -1280,8 +1294,60 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
   function setScanBusy(busy) {
     document.getElementById('scan-loading').style.display = busy ? 'flex' : 'none';
     document.getElementById('scan-ai-btn').disabled = busy;
+    document.getElementById('scan-azure-btn').disabled = busy;
     document.getElementById('scan-ocr-btn').disabled = busy;
     if (busy) document.getElementById('scan-result').style.display = 'none';
+  }
+
+  async function analyzeScanAzure() {
+    const endpoint = localStorage.getItem('seminar-azure-endpoint');
+    const key = localStorage.getItem('seminar-azure-key');
+    if (!endpoint || !key) {
+      alert('Voer eerst de Azure Endpoint URL en sleutel in via ⚙️ instellingen.');
+      openSettings();
+      return;
+    }
+    if (!scanImageBase64) return;
+
+    document.getElementById('scan-loading-msg').textContent = 'Azure Vision analyseert…';
+    setScanBusy(true);
+
+    try {
+      // Decode base64 to binary
+      const binary = atob(scanImageBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+      const url = `${endpoint}/vision/v3.2/ocr?language=nl&detectOrientation=true`;
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': key,
+          'Content-Type': 'application/octet-stream',
+        },
+        body: bytes.buffer,
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${resp.status}`);
+      }
+
+      const data = await resp.json();
+
+      // Flatten Azure OCR response to plain text
+      const text = (data.regions || [])
+        .flatMap(r => r.lines || [])
+        .map(l => (l.words || []).map(w => w.text).join(' '))
+        .join('\n');
+
+      const structured = extractFinancialFromText(text);
+      showScanResult(text.trim(), structured);
+    } catch (err) {
+      alert('Fout bij Azure Vision: ' + err.message);
+    } finally {
+      setScanBusy(false);
+    }
   }
 
   function showScanResult(extractedText, structured) {
