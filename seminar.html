@@ -1157,10 +1157,15 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error?.message || `HTTP ${resp.status}`);
+        const code = err.error?.code || err.statusCode || '';
+        const msg  = err.error?.message || err.message || 'Onbekende fout';
+        throw new Error(`HTTP ${resp.status}${code ? ' (' + code + ')' : ''}: ${msg}`);
       }
 
       const data = await resp.json();
+      if (data.error) {
+        throw new Error(`Azure fout ${data.error.code || ''}: ${data.error.message || JSON.stringify(data.error)}`);
+      }
 
       // Flatten Azure OCR response to plain text (double newline between regions preserves document structure)
       const text = (data.regions || [])
