@@ -747,6 +747,7 @@
           <tr><td style="color:#718096;padding:3px 0;">Rekening</td><td id="sf-iban" style="color:#1a202c;font-family:monospace;"></td></tr>
         </table>
       </div>
+      <div id="scan-cloud-status" style="display:none;font-size:12px;padding:6px 10px;border-radius:6px;margin-bottom:10px;"></div>
       <div class="scan-result-label">✨ Geëxtraheerde tekst</div>
       <div class="scan-result-text" id="scan-result-text"></div>
       <div class="scan-save-row">
@@ -1333,10 +1334,15 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error?.message || `HTTP ${resp.status}`);
+        const code = err.error?.code || err.statusCode || '';
+        const msg  = err.error?.message || err.message || 'Onbekende fout';
+        throw new Error(`HTTP ${resp.status}${code ? ' (' + code + ')' : ''}: ${msg}`);
       }
 
       const data = await resp.json();
+      if (data.error) {
+        throw new Error(`Azure fout ${data.error.code || ''}: ${data.error.message || JSON.stringify(data.error)}`);
+      }
 
       // Flatten Azure OCR response to plain text (double newline between regions preserves document structure)
       const text = (data.regions || [])
@@ -1380,12 +1386,38 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     renderScanHistory();
 
     const workerUrl = localStorage.getItem('seminar-worker-url');
+    const cloudEl = document.getElementById('scan-cloud-status');
     if (workerUrl) {
+      cloudEl.style.display = 'block';
+      cloudEl.style.background = '#ebf8ff';
+      cloudEl.style.color = '#2b6cb0';
+      cloudEl.style.border = '1px solid #bee3f8';
+      cloudEl.textContent = '☁️ Uploaden naar cloud…';
       fetch(`${workerUrl}/scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...scanEntry, img: `data:${scanImageMime};base64,${scanImageBase64.slice(0, 5000)}` }),
-      }).catch(() => {});
+      }).then(r => {
+        if (r.ok) {
+          cloudEl.style.background = '#f0fff4';
+          cloudEl.style.color = '#276749';
+          cloudEl.style.border = '1px solid #9ae6b4';
+          cloudEl.textContent = '✓ Opgeslagen in cloud — zichtbaar in beheerportaal';
+        } else {
+          throw new Error(`HTTP ${r.status}`);
+        }
+      }).catch(err => {
+        cloudEl.style.background = '#fff5f5';
+        cloudEl.style.color = '#c53030';
+        cloudEl.style.border = '1px solid #feb2b2';
+        cloudEl.textContent = '⚠️ Cloud upload mislukt: ' + err.message;
+      });
+    } else {
+      cloudEl.style.display = 'block';
+      cloudEl.style.background = '#fffaf0';
+      cloudEl.style.color = '#744210';
+      cloudEl.style.border = '1px solid #fbd38d';
+      cloudEl.textContent = '⚠️ Niet opgeslagen in cloud — stel Worker URL in via ⚙️ instellingen';
     }
   }
 
