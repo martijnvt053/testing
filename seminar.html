@@ -1404,7 +1404,7 @@ JSON:
       }
 
       const imageDataUrl = `data:${scanImageMime};base64,${scanImageBase64}`;
-      const { data: { text } } = await Tesseract.recognize(imageDataUrl, 'nld+eng', {
+      const { data: { text } } = await Tesseract.recognize(imageDataUrl, 'eng', {
         logger: m => {
           if (m.status === 'recognizing text') {
             document.getElementById('scan-loading-msg').textContent =
@@ -1416,7 +1416,11 @@ JSON:
       const structured = extractFinancialFromText(text);
       showScanResult(text.trim(), structured);
     } catch (err) {
-      alert('Fout bij OCR: ' + err.message);
+      if (/quota/i.test(err.message) || err.name === 'QuotaExceededError') {
+        alert('Onvoldoende opslagruimte in Safari.\n\nGa naar: ⚙️ (tandwiel) → App verversen, of wis Safari-cache via iPhone Instellingen → Safari → Geavanceerd → Websitedata.');
+      } else {
+        alert('Fout bij OCR: ' + err.message);
+      }
     } finally {
       setScanBusy(false);
     }
