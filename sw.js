@@ -1,4 +1,4 @@
-const CACHE = 'seminar-v7';
+const CACHE = 'seminar-v8';
 const CONFIG = 'seminar-config';
 
 self.addEventListener('install', e => {
