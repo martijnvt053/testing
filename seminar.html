@@ -792,7 +792,11 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
       b.summary = data.content?.[0]?.text?.trim() || '(geen samenvatting)';
     } catch (err) {
       b.summary = null;
-      alert('Fout bij ophalen samenvatting:\n' + err.message);
+      if (isQuotaError(err)) {
+        handleQuotaError();
+      } else {
+        alert('Fout bij ophalen samenvatting:\n' + err.message);
+      }
     }
 
     save();
@@ -1196,7 +1200,11 @@ JSON:
 
       showScanResult(extractedText, structured);
     } catch (err) {
-      alert('Fout bij analyseren: ' + err.message);
+      if (isQuotaError(err)) {
+        handleQuotaError();
+      } else {
+        alert('Fout bij analyseren: ' + err.message);
+      }
     } finally {
       setScanBusy(false);
     }
@@ -1363,6 +1371,15 @@ JSON:
 
   // ─── PWA & Push ──────────────────────────────────────────────────────────
   const VAPID_PUBLIC = 'BDuanFLTbpWrUdysn2CYIfiy0pqk2NU1BCOmwLJ0xVjHCmMTi45JQDxeAguFIdcwcEqqELyuozmg1w1WdVSx8j0';
+
+  function isQuotaError(err) {
+    return /quota|credit|billing|exceeded|429|402/i.test(err.message);
+  }
+
+  function handleQuotaError() {
+    localStorage.removeItem('seminar-api-key');
+    alert('Je Anthropic tegoed is op.\n\nDe API sleutel is gewist. Gebruik de gratis OCR knop (📄 OCR gratis) voor documenten scannen, en schakel samenvattingen uit via ⚙️ instellingen.');
+  }
 
   async function clearCacheAndReload() {
     try {
