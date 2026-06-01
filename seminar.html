@@ -782,14 +782,10 @@
     </div>
     <div class="settings-group">
       <label>Cloudflare Worker URL</label>
-      <input type="url" id="worker-url-input" placeholder="https://seminar-push.jouw-naam.workers.dev" autocomplete="off" />
-      <p class="settings-hint">Nodig voor push notificaties. Zie <strong>cloudflare-worker.js</strong> voor instructies.</p>
+      <input type="url" id="worker-url-input" placeholder="https://seminar-scans.jouw-naam.workers.dev" autocomplete="off" />
+      <p class="settings-hint">Nodig om gescande documenten zichtbaar te maken in het admin portaal.</p>
     </div>
     <button class="settings-save" onclick="saveSettings()">Opslaan</button>
-    <div id="push-section" style="margin-top:14px; display:none;">
-      <button class="settings-save" style="background:var(--success);" onclick="subscribePush()">🔔 Push notificaties inschakelen</button>
-      <p id="push-status" style="font-size:12px; color:var(--muted); margin-top:6px; text-align:center;"></p>
-    </div>
     <p class="settings-ok" id="settings-ok">✓ Opgeslagen!</p>
   </div>
 </div>
@@ -1107,9 +1103,6 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     document.getElementById('api-key-input').value = key ? '••••••••' + key.slice(-4) : '';
     document.getElementById('worker-url-input').value = localStorage.getItem('seminar-worker-url') || '';
     document.getElementById('settings-ok').style.display = 'none';
-    document.getElementById('push-status').textContent = '';
-    document.getElementById('push-status').style.color = 'var(--muted)';
-    updatePushSection();
     document.getElementById('settings-overlay').classList.add('open');
   }
   function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); }
@@ -1121,11 +1114,7 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
       localStorage.setItem('seminar-api-key', apiKey);
     }
     const workerUrl = document.getElementById('worker-url-input').value.trim().replace(/\/$/, '');
-    if (workerUrl) {
-      localStorage.setItem('seminar-worker-url', workerUrl);
-      sendWorkerUrlToSW(workerUrl);
-    }
-    updatePushSection();
+    if (workerUrl) localStorage.setItem('seminar-worker-url', workerUrl);
     const ok = document.getElementById('settings-ok');
     ok.style.display = 'block';
     setTimeout(() => ok.style.display = 'none', 1500);
@@ -1427,151 +1416,14 @@ JSON:
       }).join('');
   }
 
-  // ─── PWA & Push ──────────────────────────────────────────────────────────
-  const VAPID_PUBLIC = 'BDuanFLTbpWrUdysn2CYIfiy0pqk2NU1BCOmwLJ0xVjHCmMTi45JQDxeAguFIdcwcEqqELyuozmg1w1WdVSx8j0';
-  let swReg = null;
-  let deferredInstallPrompt = null;
-
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-
-  window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-    showInstallBanner();
-  });
-
-  window.addEventListener('appinstalled', () => {
-    dismissInstall();
-    setTimeout(maybeShowNotifToast, 1500);
-  });
-
-  function showInstallBanner() {
-    if (isStandalone) return;
-    if (localStorage.getItem('install-dismissed')) return;
-    const banner = document.getElementById('install-banner');
-    const msg = document.getElementById('install-msg');
-    const btn = document.getElementById('install-btn');
-    if (isIOS) {
-      msg.textContent = 'Installeer de app voor meldingen van de trainer.';
-      btn.textContent = 'Installeer';
-      btn.style.display = '';
-    } else {
-      msg.textContent = 'Installeer de app voor pushmeldingen van de trainer.';
-      btn.textContent = 'Installeer';
-      btn.style.display = '';
-    }
-    banner.classList.add('show');
-  }
-
-  function triggerInstall() {
-    if (isIOS) {
-      document.getElementById('ios-modal-overlay').classList.add('show');
-    } else if (deferredInstallPrompt) {
-      deferredInstallPrompt.prompt();
-      deferredInstallPrompt.userChoice.then(() => { deferredInstallPrompt = null; });
-    }
-  }
-
-  function closeIOSModal(e) {
-    if (e && e.target !== document.getElementById('ios-modal-overlay')) return;
-    document.getElementById('ios-modal-overlay').classList.remove('show');
-  }
-
-  function dismissInstall() {
-    localStorage.setItem('install-dismissed', '1');
-    document.getElementById('install-banner').classList.remove('show');
-  }
-
-  async function maybeShowNotifToast() {
-    if (typeof Notification === 'undefined') return;
-    if (Notification.permission !== 'default') return;
-    if (!localStorage.getItem('seminar-worker-url')) return;
-    if (localStorage.getItem('notif-toast-dismissed')) return;
-    document.getElementById('notif-toast').classList.add('show');
-  }
-
-  async function toastSubscribe() {
-    dismissToast();
-    await subscribePush();
-  }
-
-  function dismissToast() {
-    localStorage.setItem('notif-toast-dismissed', '1');
-    document.getElementById('notif-toast').classList.remove('show');
-  }
-
+  // ─── PWA ─────────────────────────────────────────────────────────────────
   async function initPWA() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      swReg = await navigator.serviceWorker.register('/testing/sw.js', { scope: '/testing/' });
-      const workerUrl = localStorage.getItem('seminar-worker-url');
-      if (workerUrl) sendWorkerUrlToSW(workerUrl);
+      await navigator.serviceWorker.register('/testing/sw.js', { scope: '/testing/' });
     } catch (e) {
       console.warn('SW registration failed:', e);
     }
-
-    if (!isStandalone) {
-      if (isIOS && !localStorage.getItem('install-dismissed')) showInstallBanner();
-    } else {
-      setTimeout(maybeShowNotifToast, 1000);
-    }
-  }
-
-  function sendWorkerUrlToSW(url) {
-    navigator.serviceWorker.ready.then(reg => {
-      reg.active?.postMessage({ type: 'SET_WORKER_URL', url });
-    });
-  }
-
-  async function subscribePush() {
-    const statusEl = document.getElementById('push-status');
-    const workerUrl = localStorage.getItem('seminar-worker-url');
-    if (!workerUrl) { statusEl.textContent = 'Sla eerst de Worker URL op.'; return; }
-
-    if (typeof Notification === 'undefined' || !('pushManager' in (await navigator.serviceWorker.ready))) {
-      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-      statusEl.style.color = 'var(--warning, #d97706)';
-      statusEl.textContent = isIOS
-        ? 'Op iPhone/iPad: tik op Delen → "Zet op beginscherm", open de app daarna vanaf je thuisscherm.'
-        : 'Push notificaties worden niet ondersteund in deze browser.';
-      return;
-    }
-
-    try {
-      statusEl.textContent = 'Toestemming vragen…';
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') { statusEl.textContent = 'Toestemming geweigerd.'; return; }
-
-      statusEl.textContent = 'Inschrijven…';
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlB64ToUint8(VAPID_PUBLIC),
-      });
-
-      await fetch(`${workerUrl}/subscribe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sub),
-      });
-
-      statusEl.textContent = '✓ Push notificaties ingeschakeld!';
-      statusEl.style.color = 'var(--success)';
-    } catch (err) {
-      statusEl.textContent = 'Fout: ' + err.message;
-    }
-  }
-
-  function urlB64ToUint8(b64) {
-    const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
-    const raw = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
-    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
-  }
-
-  function updatePushSection() {
-    const workerUrl = localStorage.getItem('seminar-worker-url');
-    document.getElementById('push-section').style.display = workerUrl ? 'block' : 'none';
   }
 
   // ─── Init ─────────────────────────────────────────────────────────────────

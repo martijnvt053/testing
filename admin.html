@@ -13,7 +13,6 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
       padding: 20px;
     }
     .card {
@@ -21,11 +20,12 @@
       border-radius: 16px;
       padding: 28px 24px;
       width: 100%;
-      max-width: 480px;
+      max-width: 560px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      margin-top: 20px;
     }
     h1 { font-size: 20px; color: #1a202c; margin-bottom: 4px; }
-    .sub { font-size: 13px; color: #718096; margin-bottom: 24px; }
+    .sub { font-size: 13px; color: #718096; margin-bottom: 20px; }
 
     label {
       display: block;
@@ -34,7 +34,7 @@
       color: #1a202c;
       margin-bottom: 6px;
     }
-    input, textarea {
+    input {
       width: 100%;
       padding: 11px 13px;
       border: 1px solid #e2e8f0;
@@ -45,47 +45,34 @@
       margin-bottom: 16px;
       color: #1a202c;
     }
-    input:focus, textarea:focus { border-color: #1a56db; }
-    textarea { resize: vertical; min-height: 100px; }
+    input:focus { border-color: #1a56db; }
 
-    .send-btn {
+    .btn {
       width: 100%;
-      padding: 14px;
+      padding: 12px;
       background: #1a56db;
       color: white;
       border: none;
       border-radius: 10px;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 700;
       cursor: pointer;
       transition: opacity 0.15s;
     }
-    .send-btn:active { opacity: 0.8; }
-    .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn:active { opacity: 0.8; }
+    .btn.green { background: #38a169; }
 
-    .result {
-      margin-top: 14px;
-      padding: 12px 14px;
-      border-radius: 8px;
-      font-size: 14px;
-      display: none;
-    }
-    .result.ok { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
-    .result.err { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
-    .result { white-space: pre-wrap; word-break: break-all; }
-
-    .scans-section { margin-top: 28px; }
-    .scans-section h2 { font-size: 16px; color: #1a202c; margin-bottom: 4px; }
-    .scans-sub { font-size: 13px; color: #718096; margin-bottom: 14px; }
+    .scans-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .scans-title { font-size: 17px; font-weight: 700; color: #1a202c; }
     .scans-refresh {
       background: none; border: 1px solid #e2e8f0; border-radius: 8px;
-      padding: 6px 12px; font-size: 13px; cursor: pointer; color: #718096; margin-bottom: 14px;
+      padding: 6px 12px; font-size: 13px; cursor: pointer; color: #718096;
     }
     .scans-refresh:active { opacity: 0.7; }
 
     .scan-card {
       background: white; border: 1px solid #e2e8f0; border-radius: 12px;
-      padding: 14px; margin-bottom: 12px; position: relative;
+      padding: 14px; margin-bottom: 12px;
     }
     .scan-card.financial { border-color: #f6ad55; }
     .scan-card-header { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
@@ -121,55 +108,46 @@
     .divider { border: none; border-top: 1px solid #e2e8f0; margin: 20px 0; }
 
     .config-toggle {
-      background: none;
-      border: none;
-      color: #718096;
-      font-size: 13px;
-      cursor: pointer;
-      text-decoration: underline;
-      padding: 0;
-      margin-bottom: 16px;
+      background: none; border: none; color: #718096; font-size: 13px;
+      cursor: pointer; text-decoration: underline; padding: 0; margin-bottom: 16px;
     }
     .config-section { display: none; }
     .config-section.open { display: block; }
     .config-hint { font-size: 11px; color: #718096; margin-top: -12px; margin-bottom: 14px; line-height: 1.5; }
+
+    .result {
+      margin-top: 10px; padding: 10px 14px; border-radius: 8px;
+      font-size: 13px; display: none;
+    }
+    .result.ok { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
+    .result.err { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
   </style>
 </head>
 <body>
 
 <div class="card">
-  <h1>📣 Beheerportaal</h1>
-  <p class="sub">Stuur een pushbericht naar alle deelnemers</p>
+  <h1>📄 Seminar Beheerportaal</h1>
+  <p class="sub">Overzicht van gescande documenten</p>
 
-  <label>Bericht</label>
-  <textarea id="message" placeholder="Typ hier je bericht voor de deelnemers…"></textarea>
-
-  <button class="send-btn" id="send-btn" onclick="sendNotification()">
-    Verstuur push notificatie
-  </button>
-
-  <div class="result" id="result"></div>
-
-  <!-- Scanned documents section -->
-  <div class="scans-section">
-    <h2>📄 Gescande documenten</h2>
-    <p class="scans-sub">Documenten gescand via de seminar app</p>
+  <div class="scans-header">
+    <span class="scans-title">Gescande documenten</span>
     <button class="scans-refresh" onclick="loadScans()">↻ Vernieuwen</button>
-    <div id="scans-list"></div>
   </div>
+  <div id="scans-list"></div>
 
   <hr class="divider">
 
   <button class="config-toggle" onclick="toggleConfig()">⚙️ Instellingen</button>
   <div class="config-section" id="config-section">
     <label>Cloudflare Worker URL</label>
-    <input type="url" id="worker-url" placeholder="https://seminar-push.naam.workers.dev" />
+    <input type="url" id="worker-url" placeholder="https://seminar-scans.jouw-naam.workers.dev" />
 
     <label>Admin sleutel</label>
     <input type="password" id="admin-key" placeholder="Je ADMIN_KEY uit Cloudflare" />
-    <p class="config-hint">Deze worden alleen lokaal opgeslagen in je browser.</p>
+    <p class="config-hint">Worden alleen lokaal opgeslagen in je browser.</p>
 
-    <button class="send-btn" style="background:#38a169;" onclick="saveConfig()">Opslaan</button>
+    <button class="btn green" onclick="saveConfig()">Opslaan</button>
+    <div class="result" id="config-result"></div>
   </div>
 </div>
 
@@ -223,7 +201,7 @@
       return `
         <div class="scan-card ${isFinancial ? 'financial' : ''}">
           <div class="scan-card-header">
-            <img class="scan-thumb" src="${s.img || ''}" alt="">
+            ${s.img ? `<img class="scan-thumb" src="${s.img}" alt="">` : ''}
             <div class="scan-meta">
               <div class="scan-time">${new Date(s.time).toLocaleString('nl-NL', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
               <div style="font-size:13px;color:#1a202c;">${esc(st.summary || s.text?.slice(0,60) || '')}</div>
@@ -254,64 +232,16 @@
   function saveConfig() {
     localStorage.setItem('admin-worker-url', document.getElementById('worker-url').value.trim().replace(/\/$/, ''));
     localStorage.setItem('admin-key', document.getElementById('admin-key').value.trim());
-    toggleConfig();
-    showResult('✓ Instellingen opgeslagen', true);
+    const el = document.getElementById('config-result');
+    el.textContent = '✓ Instellingen opgeslagen';
+    el.className = 'result ok';
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; toggleConfig(); }, 1500);
+    loadScans();
   }
 
   function toggleConfig() {
     document.getElementById('config-section').classList.toggle('open');
-  }
-
-  async function sendNotification() {
-    const message = document.getElementById('message').value.trim();
-    const workerUrl = localStorage.getItem('admin-worker-url');
-    const adminKey = localStorage.getItem('admin-key');
-
-    if (!message) { showResult('Vul een bericht in.', false); return; }
-    if (!workerUrl || !adminKey) {
-      showResult('Open eerst de instellingen en vul de Worker URL en admin sleutel in.', false);
-      document.getElementById('config-section').classList.add('open');
-      return;
-    }
-
-    const btn = document.getElementById('send-btn');
-    btn.disabled = true;
-    btn.textContent = 'Versturen…';
-
-    try {
-      const resp = await fetch(`${workerUrl}/notify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminKey}`,
-        },
-        body: JSON.stringify({ message }),
-      });
-
-      if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error(`${resp.status}: ${text}`);
-      }
-
-      const data = await resp.json();
-      let msg = `✓ Verstuurd naar ${data.sent} deelnemer${data.sent !== 1 ? 's' : ''}`;
-      if (data.errors?.length) msg += `\nMislukt (${data.errors.length}): ${data.errors.join(' | ')}`;
-      showResult(msg, data.sent > 0 || !data.errors?.length);
-      if (data.sent > 0) document.getElementById('message').value = '';
-    } catch (err) {
-      showResult('Fout: ' + err.message, false);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Verstuur push notificatie';
-    }
-  }
-
-  function showResult(msg, ok) {
-    const el = document.getElementById('result');
-    el.textContent = msg;
-    el.className = 'result ' + (ok ? 'ok' : 'err');
-    el.style.display = 'block';
-    if (ok) setTimeout(() => el.style.display = 'none', 4000);
   }
 
   load();
