@@ -14,8 +14,8 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --accent: #1a56db;
-      --accent-light: #e8f0fe;
+      --accent: #5B4FBE;
+      --accent-light: #ede9fe;
       --bg: #f5f7fa;
       --card: #ffffff;
       --border: #e2e8f0;
@@ -734,18 +734,19 @@
     </div>
 
     <div class="scan-result" id="scan-result">
-      <!-- Financial data card -->
-      <div id="scan-financial-card" style="display:none; background:#fffbeb; border:1px solid #f6e05e; border-radius:8px; padding:12px; margin-bottom:12px;">
-        <div style="font-size:11px;font-weight:700;color:#b7791f;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">💰 Financiële gegevens</div>
-        <table style="width:100%;font-size:13px;border-collapse:collapse;">
-          <tr><td style="color:#718096;padding:3px 0;width:110px;">Schuldeiser</td><td id="sf-creditor" style="font-weight:600;color:#1a202c;"></td></tr>
-          <tr><td style="color:#718096;padding:3px 0;">Adres</td><td id="sf-address" style="color:#1a202c;"></td></tr>
-          <tr><td style="color:#718096;padding:3px 0;">Contact</td><td id="sf-contact" style="color:#1a202c;"></td></tr>
-          <tr><td style="color:#718096;padding:3px 0;">Openst. schuld</td><td id="sf-amount" style="font-weight:700;color:#e53e3e;font-size:15px;"></td></tr>
-          <tr><td style="color:#718096;padding:3px 0;">Vervaldatum</td><td id="sf-due" style="color:#1a202c;"></td></tr>
-          <tr><td style="color:#718096;padding:3px 0;">Referentie</td><td id="sf-ref" style="color:#1a202c;"></td></tr>
-          <tr><td style="color:#718096;padding:3px 0;">Rekening</td><td id="sf-iban" style="color:#1a202c;font-family:monospace;"></td></tr>
-        </table>
+      <!-- Achterstand card -->
+      <div id="scan-financial-card" style="display:none;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:12px;padding:14px;margin-bottom:12px;border-left:4px solid #5B4FBE;">
+        <div style="font-size:11px;font-weight:700;color:#5B4FBE;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;">Achterstand</div>
+        <div id="sf-amount" style="font-size:22px;font-weight:800;color:#e53e3e;margin-bottom:12px;"></div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div><div style="font-size:11px;color:#718096;">Schuldeiser</div><div id="sf-creditor" style="font-size:14px;font-weight:600;color:#1a202c;"></div></div>
+          <div><div style="font-size:11px;color:#718096;">Adres</div><div id="sf-address" style="font-size:13px;color:#1a202c;"></div></div>
+          <div><div style="font-size:11px;color:#718096;">Telefoon</div><div id="sf-phone" style="font-size:13px;color:#1a202c;"></div></div>
+          <div><div style="font-size:11px;color:#718096;">E-mail</div><div id="sf-contact" style="font-size:13px;color:#1a202c;"></div></div>
+          <div><div style="font-size:11px;color:#718096;">Vervaldatum</div><div id="sf-due" style="font-size:13px;color:#1a202c;"></div></div>
+          <div><div style="font-size:11px;color:#718096;">Referentie</div><div id="sf-ref" style="font-size:13px;color:#1a202c;"></div></div>
+          <div><div style="font-size:11px;color:#718096;">Rekening/IBAN</div><div id="sf-iban" style="font-size:13px;color:#1a202c;font-family:monospace;"></div></div>
+        </div>
       </div>
       <div id="scan-cloud-status" style="display:none;font-size:12px;padding:6px 10px;border-radius:6px;margin-bottom:10px;"></div>
       <div class="scan-result-label">✨ Geëxtraheerde tekst</div>
@@ -1367,6 +1368,7 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
       document.getElementById('sf-amount').textContent   = structured.debt_amount      || '—';
       document.getElementById('sf-creditor').textContent = structured.creditor_name    || '—';
       document.getElementById('sf-address').textContent  = structured.creditor_address || '—';
+      document.getElementById('sf-phone').textContent    = structured.creditor_phone   || '—';
       document.getElementById('sf-contact').textContent  = structured.creditor_contact || '—';
       document.getElementById('sf-due').textContent      = structured.due_date         || '—';
       document.getElementById('sf-ref').textContent      = structured.reference        || '—';
@@ -1545,11 +1547,20 @@ JSON:
       s.is_financial = true;
     }
 
-    // ── IBAN ──────────────────────────────────────────────────────────────────
-    const ibanMatch = text.match(/\b(NL\d{2}[A-Z]{4}\d{10}|[A-Z]{2}\d{2}(?:[A-Z0-9]{4}\s?){2,7})\b/);
-    if (ibanMatch) {
-      s.iban = ibanMatch[1].replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim();
+    // ── IBAN / Rekeningnummer ─────────────────────────────────────────────────
+    // Probeer eerst gelabeld (Rekeningnummer:, IBAN:, Bankrekening:)
+    const ibanLabelMatch = text.match(/(?:rekeningnummer|bankrekening|iban|bank(?:rek(?:ening)?)?\.?\s*(?:nr\.?)?)[:\s]+([A-Z]{2}[\d\s]{2}[\sA-Z0-9]{8,28}|[\d][\d\s\-]{6,18})/i);
+    if (ibanLabelMatch) {
+      const raw = ibanLabelMatch[1].trim().replace(/\s+/g, ' ');
+      s.iban = raw;
       s.is_financial = true;
+    } else {
+      // Bare IBAN (NL91 ABNA 0417 1643 00 of aaneengesloten)
+      const ibanBareMatch = text.match(/\b(NL\d{2}\s?[A-Z]{4}\s?[\d\s]{10,12}|[A-Z]{2}\d{2}\s?(?:[A-Z0-9]{4}\s?){2,6}[A-Z0-9]{1,4})\b/);
+      if (ibanBareMatch) {
+        s.iban = ibanBareMatch[1].replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim();
+        s.is_financial = true;
+      }
     }
 
     // ── Referentienummer ──────────────────────────────────────────────────────
@@ -1558,7 +1569,7 @@ JSON:
     if (refMatch) s.reference = refMatch[1].trim().split('\n')[0].trim();
 
     // ── Vervaldatum ───────────────────────────────────────────────────────────
-    const duePat = /(?:vervaldatum|uiterste betaaldatum|uiterlijk betalen|te betalen voor|betalen voor|betalen v[oó][oó]r|v[oó][oó]r|uiterlijk)[:\s]+(\d{1,2}[\s\-\/]\d{1,2}[\s\-\/]\d{2,4}|\d{1,2}\s+\w{3,9}\.?\s+\d{4})/i;
+    const duePat = /(?:vervaldatum|uiterste betaaldatum|uiterlijk betalen|te betalen(?:\s+v[oó][oó]r)?|betalen v[oó][oó]r|v[oó][oó]r|uiterlijk|te voldoen(?:\s+v[oó][oó]r)?|dient(?:\s+te worden)?\s+voldaan(?:\s+v[oó][oó]r)?|voldaan\s+v[oó][oó]r|betaaldatum)[:\s]+(\d{1,2}[\s\-\/]\d{1,2}[\s\-\/]\d{2,4}|\d{1,2}\s+\w{3,9}\.?\s+\d{4})/i;
     const dueMatch = text.match(duePat);
     if (dueMatch) s.due_date = dueMatch[1].trim();
 
@@ -1590,13 +1601,13 @@ JSON:
       if (pcMatch) s.creditor_address = `${pcMatch[1]} ${pcMatch[2].trim()}`;
     }
 
-    // ── Contact (email / telefoon) ────────────────────────────────────────────
+    // ── Telefoon ──────────────────────────────────────────────────────────────
+    const telMatch = text.match(/(?:tel(?:efoon)?\.?|t\.?|phone|mob(?:iel)?\.?|fax)[:\s]+([\+\d][\d\s\-\(\)\.]{5,20})/i);
+    if (telMatch) s.creditor_phone = telMatch[1].trim().replace(/\s+/g, ' ');
+
+    // ── E-mail ────────────────────────────────────────────────────────────────
     const emailMatch = text.match(/[\w.+\-]+@[\w\-]+(?:\.[\w\-]+)+/);
     if (emailMatch) s.creditor_contact = emailMatch[0];
-    if (!s.creditor_contact) {
-      const telMatch = text.match(/(?:tel(?:efoon)?\.?|t\.?|phone|mob(?:iel)?\.?)[:\s]*([\+\d][\d\s\-\(\)\.]{6,20})/i);
-      if (telMatch) s.creditor_contact = telMatch[1].trim().replace(/\s+/g, ' ');
-    }
 
     // ── Financieel document herkend op trefwoorden ────────────────────────────
     if (!s.is_financial) {
@@ -1611,7 +1622,7 @@ JSON:
       const parts = [];
       if (s.creditor_name) parts.push('van ' + s.creditor_name);
       if (s.debt_amount) parts.push(s.debt_amount);
-      s.summary = 'Schulddocument' + (parts.length ? ' ' + parts.join(' · ') : '');
+      s.summary = 'Achterstand' + (parts.length ? ' ' + parts.join(' · ') : '');
     }
 
     return s;
@@ -1676,7 +1687,7 @@ JSON:
         const isFinancial = s.is_financial && (s.debt_amount || s.creditor_name);
         const finBox = isFinancial ? `
           <div class="scan-fin-box">
-            <div class="scan-fin-label">💰 Financiële gegevens</div>
+            <div class="scan-fin-label">Achterstand</div>
             ${s.debt_amount ? `<div class="scan-fin-amount">${escHtml(s.debt_amount)}</div>` : ''}
             ${s.creditor_name ? `<div class="scan-fin-row"><span>Van</span><span><strong>${escHtml(s.creditor_name)}</strong></span></div>` : ''}
             ${s.reference    ? `<div class="scan-fin-row"><span>Referentie</span><span>${escHtml(s.reference)}</span></div>` : ''}

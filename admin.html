@@ -3,161 +3,246 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Seminar Beheerportaal</title>
+  <meta name="theme-color" content="#5B4FBE">
+  <title>Beheerportaal</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --purple: #5B4FBE;
+      --purple-light: #ede9fe;
+      --bg: #f4f4f8;
+      --card: #ffffff;
+      --border: #e8e8f0;
+      --text: #1a1a2e;
+      --muted: #7c7c99;
+      --danger: #e53e3e;
+      --success: #38a169;
+    }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #f5f7fa;
+      background: var(--bg);
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
+      padding-bottom: 32px;
     }
-    .card {
-      background: white;
-      border-radius: 16px;
-      padding: 28px 24px;
-      width: 100%;
-      max-width: 560px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-      margin-top: 20px;
-    }
-    h1 { font-size: 20px; color: #1a202c; margin-bottom: 4px; }
-    .sub { font-size: 13px; color: #718096; margin-bottom: 20px; }
 
-    label {
-      display: block;
-      font-size: 13px;
-      font-weight: 600;
-      color: #1a202c;
-      margin-bottom: 6px;
+    /* Header */
+    .app-header {
+      background: var(--purple);
+      color: white;
+      padding: 20px 20px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-    input, textarea {
+    .app-header h1 { font-size: 20px; font-weight: 700; }
+    .app-header .sub { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+    .header-badge {
+      background: rgba(255,255,255,0.25);
+      border-radius: 50px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    /* Sections */
+    .section { padding: 16px 16px 0; }
+    .section-title {
+      font-size: 13px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.6px;
+      margin-bottom: 10px;
+    }
+
+    /* Card */
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+      margin-bottom: 16px;
+    }
+
+    /* Form fields */
+    .field-group { padding: 4px 0; }
+    .field-row {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .field-row:last-child { border-bottom: none; }
+    .field-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .field-label strong { color: var(--text); font-size: 14px; font-weight: 600; }
+    textarea, input[type="url"], input[type="password"] {
       width: 100%;
-      padding: 11px 13px;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
+      padding: 10px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
       font-size: 14px;
       font-family: inherit;
       outline: none;
-      margin-bottom: 16px;
-      color: #1a202c;
+      color: var(--text);
+      background: white;
+      margin-top: 6px;
     }
-    input:focus, textarea:focus { border-color: #1a56db; }
-    textarea { resize: vertical; min-height: 90px; }
+    textarea:focus, input:focus { border-color: var(--purple); }
+    textarea { resize: vertical; min-height: 80px; }
 
+    /* Buttons */
     .btn {
       width: 100%;
-      padding: 13px;
-      background: #1a56db;
+      padding: 14px;
+      background: var(--purple);
       color: white;
       border: none;
-      border-radius: 10px;
+      border-radius: 12px;
       font-size: 15px;
       font-weight: 700;
       cursor: pointer;
       transition: opacity 0.15s;
     }
     .btn:active { opacity: 0.8; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn.green { background: #38a169; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-secondary {
+      background: none; border: 1.5px solid var(--purple);
+      color: var(--purple); border-radius: 10px;
+      padding: 8px 16px; font-size: 13px; font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-secondary:active { opacity: 0.7; }
+    .btn-save { background: var(--success); }
 
     .result {
-      margin-top: 12px; padding: 10px 14px; border-radius: 8px;
-      font-size: 13px; display: none; white-space: pre-wrap;
+      margin-top: 10px; padding: 10px 14px; border-radius: 10px;
+      font-size: 13px; display: none;
     }
     .result.ok { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
     .result.err { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
 
-    .divider { border: none; border-top: 1px solid #e2e8f0; margin: 24px 0; }
-
-    .scans-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-    .scans-title { font-size: 17px; font-weight: 700; color: #1a202c; }
-    .scans-refresh {
-      background: none; border: 1px solid #e2e8f0; border-radius: 8px;
-      padding: 6px 12px; font-size: 13px; cursor: pointer; color: #718096;
+    /* Scans list header */
+    .scans-header {
+      display: flex; align-items: center;
+      justify-content: space-between; margin-bottom: 10px;
     }
-    .scans-refresh:active { opacity: 0.7; }
 
+    /* Scan card */
     .scan-card {
-      background: white; border: 1px solid #e2e8f0; border-radius: 12px;
-      padding: 14px; margin-bottom: 12px;
+      background: var(--card);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+      margin-bottom: 12px;
+      border-left: 4px solid transparent;
     }
-    .scan-card.financial { border-color: #f6ad55; }
-    .scan-card-header { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
-    .scan-thumb { width: 56px; height: 56px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+    .scan-card.financial { border-left-color: var(--purple); }
+    .scan-card-header {
+      display: flex; gap: 12px; align-items: center;
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .scan-avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: var(--purple-light); color: var(--purple);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
     .scan-meta { flex: 1; min-width: 0; }
-    .scan-time { font-size: 11px; color: #718096; margin-bottom: 4px; }
+    .scan-time { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+    .scan-summary { font-size: 14px; font-weight: 600; color: var(--text); }
     .scan-del-btn {
-      background: none; border: none; color: #ccc; font-size: 20px;
-      cursor: pointer; padding: 0; flex-shrink: 0;
+      background: none; border: none; color: #ccc; font-size: 18px;
+      cursor: pointer; padding: 4px; flex-shrink: 0;
     }
-    .scan-del-btn:active { color: #e53e3e; }
+    .scan-del-btn:active { color: var(--danger); }
 
-    .financial-box {
-      background: #fffbeb; border: 1px solid #f6e05e; border-radius: 8px;
-      padding: 10px 12px; margin-bottom: 10px;
+    /* Achterstand box */
+    .achterstand-box { padding: 12px 14px; }
+    .achterstand-title {
+      font-size: 12px; font-weight: 700; color: var(--purple);
+      text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px;
     }
-    .financial-box .fb-label {
-      font-size: 11px; font-weight: 700; color: #b7791f;
-      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+    .ach-amount {
+      font-size: 22px; font-weight: 800; color: var(--danger); margin-bottom: 12px;
     }
-    .financial-box table { width: 100%; font-size: 13px; border-collapse: collapse; }
-    .financial-box td { padding: 2px 0; vertical-align: top; }
-    .financial-box .fb-key { color: #718096; width: 110px; }
-    .financial-box .fb-amount { font-weight: 700; color: #e53e3e; font-size: 15px; }
+    .ach-fields { display: flex; flex-direction: column; gap: 8px; }
+    .ach-field { }
+    .ach-key { font-size: 11px; color: var(--muted); margin-bottom: 1px; }
+    .ach-val { font-size: 13px; color: var(--text); font-weight: 500; }
+    .ach-val.mono { font-family: 'Courier New', monospace; font-size: 12px; }
 
     .scan-text-preview {
-      font-size: 12px; color: #718096; line-height: 1.5;
+      padding: 10px 14px;
+      font-size: 12px; color: var(--muted); line-height: 1.5;
       overflow: hidden; display: -webkit-box;
-      -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      border-top: 1px solid var(--border);
     }
-    .scans-empty { text-align: center; padding: 32px; color: #718096; font-size: 14px; }
 
+    .scans-empty {
+      text-align: center; padding: 36px 20px;
+      color: var(--muted); font-size: 14px;
+    }
+    .scans-empty .empty-icon { font-size: 36px; margin-bottom: 10px; }
+
+    /* Config toggle */
     .config-toggle {
-      background: none; border: none; color: #718096; font-size: 13px;
-      cursor: pointer; text-decoration: underline; padding: 0; margin-bottom: 16px;
+      background: none; border: none; color: var(--purple);
+      font-size: 13px; cursor: pointer; font-weight: 600;
+      padding: 0; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 4px;
     }
     .config-section { display: none; }
     .config-section.open { display: block; }
-    .config-hint { font-size: 11px; color: #718096; margin-top: -12px; margin-bottom: 14px; line-height: 1.5; }
+    .config-hint { font-size: 11px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
   </style>
 </head>
 <body>
 
-<div class="card">
-  <h1>📣 Beheerportaal</h1>
-  <p class="sub">Stuur een pushbericht naar alle deelnemers</p>
+<div class="app-header">
+  <div>
+    <h1>Beheerportaal</h1>
+    <div class="sub">Seminar — Ben Tichelaar MBA</div>
+  </div>
+  <div class="header-badge">Admin</div>
+</div>
 
-  <label>Bericht</label>
-  <textarea id="message" placeholder="Typ hier je bericht voor de deelnemers…"></textarea>
+<div class="section">
+  <div class="section-title">Push notificatie</div>
+  <div class="card">
+    <div class="field-row">
+      <div class="field-label">Bericht aan deelnemers</div>
+      <textarea id="message" placeholder="Typ hier je bericht…"></textarea>
+    </div>
+    <div class="field-row">
+      <button class="btn" id="send-btn" onclick="sendNotification()">Verstuur push notificatie</button>
+      <div class="result" id="send-result"></div>
+    </div>
+  </div>
+</div>
 
-  <button class="btn" id="send-btn" onclick="sendNotification()">Verstuur push notificatie</button>
-  <div class="result" id="send-result"></div>
-
-  <hr class="divider">
-
+<div class="section">
   <div class="scans-header">
-    <span class="scans-title">📄 Gescande documenten</span>
-    <button class="scans-refresh" onclick="loadScans()">↻ Vernieuwen</button>
+    <div class="section-title" style="margin-bottom:0">Gescande documenten</div>
+    <button class="btn-secondary" onclick="loadScans()">↻ Vernieuwen</button>
   </div>
   <div id="scans-list"></div>
+</div>
 
-  <hr class="divider">
-
+<div class="section">
   <button class="config-toggle" onclick="toggleConfig()">⚙️ Instellingen</button>
   <div class="config-section" id="config-section">
-    <label>Cloudflare Worker URL</label>
-    <input type="url" id="worker-url" placeholder="https://seminar-push.naam.workers.dev" />
-
-    <label>Admin sleutel</label>
-    <input type="password" id="admin-key" placeholder="Je ADMIN_KEY uit Cloudflare" />
-    <p class="config-hint">Worden alleen lokaal opgeslagen in je browser.</p>
-
-    <button class="btn green" onclick="saveConfig()">Opslaan</button>
-    <div class="result" id="config-result"></div>
+    <div class="card">
+      <div class="field-row">
+        <div class="field-label">Cloudflare Worker URL</div>
+        <input type="url" id="worker-url" placeholder="https://seminar-push.naam.workers.dev" />
+      </div>
+      <div class="field-row">
+        <div class="field-label">Admin sleutel</div>
+        <input type="password" id="admin-key" placeholder="Je ADMIN_KEY uit Cloudflare" />
+        <p class="config-hint" style="margin-top:6px;">Worden alleen lokaal opgeslagen in je browser.</p>
+      </div>
+      <div class="field-row">
+        <button class="btn btn-save" onclick="saveConfig()">Opslaan</button>
+        <div class="result" id="config-result"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -172,18 +257,14 @@
     const message = document.getElementById('message').value.trim();
     const workerUrl = localStorage.getItem('admin-worker-url');
     const adminKey = localStorage.getItem('admin-key');
-
     if (!message) { showResult('send-result', 'Vul een bericht in.', false); return; }
     if (!workerUrl || !adminKey) {
       showResult('send-result', 'Open eerst de instellingen en vul de Worker URL en admin sleutel in.', false);
       document.getElementById('config-section').classList.add('open');
       return;
     }
-
     const btn = document.getElementById('send-btn');
-    btn.disabled = true;
-    btn.textContent = 'Versturen…';
-
+    btn.disabled = true; btn.textContent = 'Versturen…';
     try {
       const resp = await fetch(`${workerUrl}/notify`, {
         method: 'POST',
@@ -199,8 +280,7 @@
     } catch (err) {
       showResult('send-result', 'Fout: ' + err.message, false);
     } finally {
-      btn.disabled = false;
-      btn.textContent = 'Verstuur push notificatie';
+      btn.disabled = false; btn.textContent = 'Verstuur push notificatie';
     }
   }
 
@@ -209,14 +289,12 @@
     const adminKey = localStorage.getItem('admin-key');
     const el = document.getElementById('scans-list');
     if (!workerUrl || !adminKey) {
-      el.innerHTML = '<p class="scans-empty">Stel eerst de Worker URL en admin sleutel in via ⚙️ instellingen.</p>';
+      el.innerHTML = '<p class="scans-empty"><div class="empty-icon">⚙️</div>Stel eerst de Worker URL en admin sleutel in via instellingen hieronder.</p>';
       return;
     }
     el.innerHTML = '<p class="scans-empty">Laden…</p>';
     try {
-      const resp = await fetch(`${workerUrl}/scans`, {
-        headers: { 'Authorization': `Bearer ${adminKey}` }
-      });
+      const resp = await fetch(`${workerUrl}/scans`, { headers: { 'Authorization': `Bearer ${adminKey}` } });
       if (!resp.ok) throw new Error(resp.status);
       renderScans(await resp.json());
     } catch (e) {
@@ -226,36 +304,48 @@
 
   function renderScans(scans) {
     const el = document.getElementById('scans-list');
-    if (!scans.length) { el.innerHTML = '<p class="scans-empty">Nog geen gescande documenten.</p>'; return; }
+    if (!scans.length) {
+      el.innerHTML = '<p class="scans-empty"><div class="empty-icon">📄</div>Nog geen gescande documenten.</p>';
+      return;
+    }
     el.innerHTML = scans.map(s => {
       const st = s.structured || {};
       const isFinancial = st.is_financial && (st.debt_amount || st.creditor_name);
-      const financialHtml = isFinancial ? `
-        <div class="financial-box">
-          <div class="fb-label">💰 Financiële gegevens</div>
-          <table>
-            <tr><td class="fb-key">Schuldeiser</td><td><strong>${esc(st.creditor_name || '—')}</strong></td></tr>
-            <tr><td class="fb-key">Adres</td><td>${esc(st.creditor_address || '—')}</td></tr>
-            <tr><td class="fb-key">Contact</td><td>${esc(st.creditor_contact || '—')}</td></tr>
-            <tr><td class="fb-key">Openst. schuld</td><td class="fb-amount">${esc(st.debt_amount || '—')}</td></tr>
-            <tr><td class="fb-key">Vervaldatum</td><td>${esc(st.due_date || '—')}</td></tr>
-            <tr><td class="fb-key">Referentie</td><td>${esc(st.reference || '—')}</td></tr>
-            <tr><td class="fb-key">Rekening</td><td style="font-family:monospace">${esc(st.iban || '—')}</td></tr>
-          </table>
+      const fields = [
+        { key: 'Schuldeiser',   val: st.creditor_name    },
+        { key: 'Adres',         val: st.creditor_address },
+        { key: 'Telefoon',      val: st.creditor_phone   },
+        { key: 'E-mail',        val: st.creditor_contact },
+        { key: 'Vervaldatum',   val: st.due_date         },
+        { key: 'Referentie',    val: st.reference        },
+        { key: 'Rekening/IBAN', val: st.iban, mono: true },
+      ].filter(f => f.val);
+      const achterstandHtml = isFinancial ? `
+        <div class="achterstand-box">
+          <div class="achterstand-title">Achterstand</div>
+          ${st.debt_amount ? `<div class="ach-amount">${esc(st.debt_amount)}</div>` : ''}
+          <div class="ach-fields">
+            ${fields.map(f => `
+              <div class="ach-field">
+                <div class="ach-key">${f.key}</div>
+                <div class="ach-val${f.mono ? ' mono' : ''}">${esc(f.val)}</div>
+              </div>`).join('')}
+          </div>
         </div>` : '';
       const scanKey = (s._key || s.id || '').replace('scan-', '');
+      const summary = st.summary || s.text?.slice(0, 60) || 'Document';
       return `
         <div class="scan-card ${isFinancial ? 'financial' : ''}">
           <div class="scan-card-header">
-            ${s.img ? `<img class="scan-thumb" src="${s.img}" alt="">` : ''}
+            <div class="scan-avatar">📄</div>
             <div class="scan-meta">
               <div class="scan-time">${new Date(s.time).toLocaleString('nl-NL', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
-              <div style="font-size:13px;color:#1a202c;">${esc(st.summary || s.text?.slice(0,60) || '')}</div>
+              <div class="scan-summary">${esc(summary)}</div>
             </div>
-            <button class="scan-del-btn" onclick="deleteScan('${scanKey}', this)">✕</button>
+            <button class="scan-del-btn" onclick="deleteScan('${scanKey}', this)" title="Verwijderen">✕</button>
           </div>
-          ${financialHtml}
-          <div class="scan-text-preview">${esc(s.text || '')}</div>
+          ${achterstandHtml}
+          ${s.text ? `<div class="scan-text-preview">${esc(s.text)}</div>` : ''}
         </div>`;
     }).join('');
   }
