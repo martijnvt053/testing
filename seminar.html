@@ -782,10 +782,14 @@
     </div>
     <div class="settings-group">
       <label>Cloudflare Worker URL</label>
-      <input type="url" id="worker-url-input" placeholder="https://seminar-scans.jouw-naam.workers.dev" autocomplete="off" />
-      <p class="settings-hint">Nodig om gescande documenten zichtbaar te maken in het admin portaal.</p>
+      <input type="url" id="worker-url-input" placeholder="https://seminar-push.jouw-naam.workers.dev" autocomplete="off" />
+      <p class="settings-hint">Nodig voor push notificaties en document scans.</p>
     </div>
     <button class="settings-save" onclick="saveSettings()">Opslaan</button>
+    <div id="push-section" style="margin-top:14px; display:none;">
+      <button class="settings-save" style="background:var(--success);" onclick="subscribePush()">🔔 Push notificaties inschakelen</button>
+      <p id="push-status" style="font-size:12px; color:var(--muted); margin-top:6px; text-align:center;"></p>
+    </div>
     <p class="settings-ok" id="settings-ok">✓ Opgeslagen!</p>
   </div>
 </div>
@@ -1103,6 +1107,8 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     document.getElementById('api-key-input').value = key ? '••••••••' + key.slice(-4) : '';
     document.getElementById('worker-url-input').value = localStorage.getItem('seminar-worker-url') || '';
     document.getElementById('settings-ok').style.display = 'none';
+    document.getElementById('push-status').textContent = '';
+    updatePushSection();
     document.getElementById('settings-overlay').classList.add('open');
   }
   function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); }
@@ -1114,7 +1120,11 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
       localStorage.setItem('seminar-api-key', apiKey);
     }
     const workerUrl = document.getElementById('worker-url-input').value.trim().replace(/\/$/, '');
-    if (workerUrl) localStorage.setItem('seminar-worker-url', workerUrl);
+    if (workerUrl) {
+      localStorage.setItem('seminar-worker-url', workerUrl);
+      sendWorkerUrlToSW(workerUrl);
+    }
+    updatePushSection();
     const ok = document.getElementById('settings-ok');
     ok.style.display = 'block';
     setTimeout(() => ok.style.display = 'none', 1500);
@@ -1416,14 +1426,61 @@ JSON:
       }).join('');
   }
 
-  // ─── PWA ─────────────────────────────────────────────────────────────────
+  // ─── PWA & Push ──────────────────────────────────────────────────────────
+  const VAPID_PUBLIC = 'BDuanFLTbpWrUdysn2CYIfiy0pqk2NU1BCOmwLJ0xVjHCmMTi45JQDxeAguFIdcwcEqqELyuozmg1w1WdVSx8j0';
+
   async function initPWA() {
     if (!('serviceWorker' in navigator)) return;
     try {
       await navigator.serviceWorker.register('/testing/sw.js', { scope: '/testing/' });
+      const workerUrl = localStorage.getItem('seminar-worker-url');
+      if (workerUrl) sendWorkerUrlToSW(workerUrl);
     } catch (e) {
       console.warn('SW registration failed:', e);
     }
+  }
+
+  function sendWorkerUrlToSW(url) {
+    navigator.serviceWorker.ready.then(reg => {
+      reg.active?.postMessage({ type: 'SET_WORKER_URL', url });
+    });
+  }
+
+  async function subscribePush() {
+    const statusEl = document.getElementById('push-status');
+    const workerUrl = localStorage.getItem('seminar-worker-url');
+    if (!workerUrl) { statusEl.textContent = 'Sla eerst de Worker URL op.'; return; }
+    try {
+      statusEl.textContent = 'Toestemming vragen…';
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { statusEl.textContent = 'Toestemming geweigerd.'; return; }
+      statusEl.textContent = 'Inschrijven…';
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8(VAPID_PUBLIC),
+      });
+      await fetch(`${workerUrl}/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub),
+      });
+      statusEl.textContent = '✓ Push notificaties ingeschakeld!';
+      statusEl.style.color = 'var(--success)';
+    } catch (err) {
+      statusEl.textContent = 'Fout: ' + err.message;
+    }
+  }
+
+  function urlB64ToUint8(b64) {
+    const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
+    const raw = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+  }
+
+  function updatePushSection() {
+    const workerUrl = localStorage.getItem('seminar-worker-url');
+    document.getElementById('push-section').style.display = workerUrl ? 'block' : 'none';
   }
 
   // ─── Init ─────────────────────────────────────────────────────────────────

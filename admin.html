@@ -34,7 +34,7 @@
       color: #1a202c;
       margin-bottom: 6px;
     }
-    input {
+    input, textarea {
       width: 100%;
       padding: 11px 13px;
       border: 1px solid #e2e8f0;
@@ -45,11 +45,12 @@
       margin-bottom: 16px;
       color: #1a202c;
     }
-    input:focus { border-color: #1a56db; }
+    input:focus, textarea:focus { border-color: #1a56db; }
+    textarea { resize: vertical; min-height: 90px; }
 
     .btn {
       width: 100%;
-      padding: 12px;
+      padding: 13px;
       background: #1a56db;
       color: white;
       border: none;
@@ -60,7 +61,17 @@
       transition: opacity 0.15s;
     }
     .btn:active { opacity: 0.8; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn.green { background: #38a169; }
+
+    .result {
+      margin-top: 12px; padding: 10px 14px; border-radius: 8px;
+      font-size: 13px; display: none; white-space: pre-wrap;
+    }
+    .result.ok { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
+    .result.err { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
+
+    .divider { border: none; border-top: 1px solid #e2e8f0; margin: 24px 0; }
 
     .scans-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
     .scans-title { font-size: 17px; font-weight: 700; color: #1a202c; }
@@ -105,8 +116,6 @@
     }
     .scans-empty { text-align: center; padding: 32px; color: #718096; font-size: 14px; }
 
-    .divider { border: none; border-top: 1px solid #e2e8f0; margin: 20px 0; }
-
     .config-toggle {
       background: none; border: none; color: #718096; font-size: 13px;
       cursor: pointer; text-decoration: underline; padding: 0; margin-bottom: 16px;
@@ -114,23 +123,24 @@
     .config-section { display: none; }
     .config-section.open { display: block; }
     .config-hint { font-size: 11px; color: #718096; margin-top: -12px; margin-bottom: 14px; line-height: 1.5; }
-
-    .result {
-      margin-top: 10px; padding: 10px 14px; border-radius: 8px;
-      font-size: 13px; display: none;
-    }
-    .result.ok { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
-    .result.err { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
   </style>
 </head>
 <body>
 
 <div class="card">
-  <h1>📄 Seminar Beheerportaal</h1>
-  <p class="sub">Overzicht van gescande documenten</p>
+  <h1>📣 Beheerportaal</h1>
+  <p class="sub">Stuur een pushbericht naar alle deelnemers</p>
+
+  <label>Bericht</label>
+  <textarea id="message" placeholder="Typ hier je bericht voor de deelnemers…"></textarea>
+
+  <button class="btn" id="send-btn" onclick="sendNotification()">Verstuur push notificatie</button>
+  <div class="result" id="send-result"></div>
+
+  <hr class="divider">
 
   <div class="scans-header">
-    <span class="scans-title">Gescande documenten</span>
+    <span class="scans-title">📄 Gescande documenten</span>
     <button class="scans-refresh" onclick="loadScans()">↻ Vernieuwen</button>
   </div>
   <div id="scans-list"></div>
@@ -140,7 +150,7 @@
   <button class="config-toggle" onclick="toggleConfig()">⚙️ Instellingen</button>
   <div class="config-section" id="config-section">
     <label>Cloudflare Worker URL</label>
-    <input type="url" id="worker-url" placeholder="https://seminar-scans.jouw-naam.workers.dev" />
+    <input type="url" id="worker-url" placeholder="https://seminar-push.naam.workers.dev" />
 
     <label>Admin sleutel</label>
     <input type="password" id="admin-key" placeholder="Je ADMIN_KEY uit Cloudflare" />
@@ -158,6 +168,42 @@
     loadScans();
   }
 
+  async function sendNotification() {
+    const message = document.getElementById('message').value.trim();
+    const workerUrl = localStorage.getItem('admin-worker-url');
+    const adminKey = localStorage.getItem('admin-key');
+
+    if (!message) { showResult('send-result', 'Vul een bericht in.', false); return; }
+    if (!workerUrl || !adminKey) {
+      showResult('send-result', 'Open eerst de instellingen en vul de Worker URL en admin sleutel in.', false);
+      document.getElementById('config-section').classList.add('open');
+      return;
+    }
+
+    const btn = document.getElementById('send-btn');
+    btn.disabled = true;
+    btn.textContent = 'Versturen…';
+
+    try {
+      const resp = await fetch(`${workerUrl}/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminKey}` },
+        body: JSON.stringify({ message }),
+      });
+      if (!resp.ok) throw new Error(`${resp.status}: ${await resp.text()}`);
+      const data = await resp.json();
+      let msg = `✓ Verstuurd naar ${data.sent} deelnemer${data.sent !== 1 ? 's' : ''}`;
+      if (data.failed) msg += ` (${data.failed} mislukt)`;
+      showResult('send-result', msg, true);
+      if (data.sent > 0) document.getElementById('message').value = '';
+    } catch (err) {
+      showResult('send-result', 'Fout: ' + err.message, false);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Verstuur push notificatie';
+    }
+  }
+
   async function loadScans() {
     const workerUrl = localStorage.getItem('admin-worker-url');
     const adminKey = localStorage.getItem('admin-key');
@@ -172,8 +218,7 @@
         headers: { 'Authorization': `Bearer ${adminKey}` }
       });
       if (!resp.ok) throw new Error(resp.status);
-      const scans = await resp.json();
-      renderScans(scans);
+      renderScans(await resp.json());
     } catch (e) {
       el.innerHTML = `<p class="scans-empty">Kon scans niet laden: ${e.message}</p>`;
     }
@@ -232,16 +277,21 @@
   function saveConfig() {
     localStorage.setItem('admin-worker-url', document.getElementById('worker-url').value.trim().replace(/\/$/, ''));
     localStorage.setItem('admin-key', document.getElementById('admin-key').value.trim());
-    const el = document.getElementById('config-result');
-    el.textContent = '✓ Instellingen opgeslagen';
-    el.className = 'result ok';
-    el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; toggleConfig(); }, 1500);
+    showResult('config-result', '✓ Instellingen opgeslagen', true);
+    setTimeout(toggleConfig, 1500);
     loadScans();
   }
 
   function toggleConfig() {
     document.getElementById('config-section').classList.toggle('open');
+  }
+
+  function showResult(id, msg, ok) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.className = 'result ' + (ok ? 'ok' : 'err');
+    el.style.display = 'block';
+    if (ok) setTimeout(() => el.style.display = 'none', 4000);
   }
 
   load();
