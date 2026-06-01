@@ -240,6 +240,7 @@
             <tr><td class="fb-key">Openst. schuld</td><td class="fb-amount">${esc(st.debt_amount || '—')}</td></tr>
             <tr><td class="fb-key">Vervaldatum</td><td>${esc(st.due_date || '—')}</td></tr>
             <tr><td class="fb-key">Referentie</td><td>${esc(st.reference || '—')}</td></tr>
+            <tr><td class="fb-key">Rekening</td><td style="font-family:monospace">${esc(st.iban || '—')}</td></tr>
           </table>
         </div>` : '';
       const scanKey = (s._key || s.id || '').replace('scan-', '');

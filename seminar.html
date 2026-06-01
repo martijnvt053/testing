@@ -566,6 +566,7 @@
           <tr><td style="color:#718096;padding:3px 0;">Openst. schuld</td><td id="sf-amount" style="font-weight:700;color:#e53e3e;font-size:15px;"></td></tr>
           <tr><td style="color:#718096;padding:3px 0;">Vervaldatum</td><td id="sf-due" style="color:#1a202c;"></td></tr>
           <tr><td style="color:#718096;padding:3px 0;">Referentie</td><td id="sf-ref" style="color:#1a202c;"></td></tr>
+          <tr><td style="color:#718096;padding:3px 0;">Rekening</td><td id="sf-iban" style="color:#1a202c;font-family:monospace;"></td></tr>
         </table>
       </div>
       <div class="scan-result-label">✨ Geëxtraheerde tekst</div>
@@ -1109,6 +1110,7 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
       document.getElementById('sf-contact').textContent  = structured.creditor_contact || '—';
       document.getElementById('sf-due').textContent      = structured.due_date         || '—';
       document.getElementById('sf-ref').textContent      = structured.reference        || '—';
+      document.getElementById('sf-iban').textContent     = structured.iban             || '—';
       card.style.display = 'block';
     } else {
       card.style.display = 'none';
@@ -1171,6 +1173,7 @@ JSON:
   "creditor_contact": "telefoon of email van schuldeiser" of null,
   "due_date": "uiterste betaaldatum" of null,
   "reference": "referentie- of factuurnummer" of null,
+  "iban": "rekeningnummer van de schuldeiser (IBAN), bijv. NL91ABNA0417164300" of null,
   "summary": "één zin samenvatting van het document"
 }` },
             ],
@@ -1270,6 +1273,10 @@ JSON:
     const telMatch = text.match(/(?:tel\.?|telefoon)[:\s]*([\d\s\-\+\(\)]{8,})/i);
     if (telMatch && !s.creditor_contact) s.creditor_contact = telMatch[1].trim();
 
+    // IBAN rekeningnummer
+    const ibanMatch = text.match(/\b([A-Z]{2}\d{2}[\s]?(?:[A-Z0-9]{4}[\s]?){1,7}[A-Z0-9]{1,4})\b/);
+    if (ibanMatch) s.iban = ibanMatch[1].replace(/\s/g, ' ').trim();
+
     if (s.is_financial) {
       s.summary = `Schulddocument${s.creditor_name ? ' van ' + s.creditor_name : ''}${s.debt_amount ? ' · ' + s.debt_amount : ''}`;
     }
@@ -1332,6 +1339,7 @@ JSON:
             ${s.creditor_name ? `<div class="scan-fin-row"><span>Van</span><span><strong>${escHtml(s.creditor_name)}</strong></span></div>` : ''}
             ${s.reference    ? `<div class="scan-fin-row"><span>Referentie</span><span>${escHtml(s.reference)}</span></div>` : ''}
             ${s.due_date     ? `<div class="scan-fin-row"><span>Vervaldatum</span><span>${escHtml(s.due_date)}</span></div>` : ''}
+            ${s.iban         ? `<div class="scan-fin-row"><span>Rekening</span><span style="font-family:monospace">${escHtml(s.iban)}</span></div>` : ''}
             ${s.creditor_address ? `<div class="scan-fin-row"><span>Adres</span><span>${escHtml(s.creditor_address)}</span></div>` : ''}
           </div>` : '';
         return `
