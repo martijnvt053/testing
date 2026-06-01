@@ -32,7 +32,7 @@
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      padding-bottom: 80px;
+      padding-bottom: 70px;
     }
 
     /* Recording banner */
@@ -379,6 +379,125 @@
     }
     .settings-save:active { opacity: 0.8; }
     .settings-ok { color: var(--success); font-size: 13px; text-align: center; margin-top: 8px; display: none; }
+
+    /* ── Tab navigation ─────────────────────────────────────── */
+    .tab-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: white;
+      border-top: 1px solid var(--border);
+      display: flex;
+      z-index: 100;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px 4px 8px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 500;
+    }
+    .tab-btn .tab-icon { font-size: 22px; line-height: 1; }
+    .tab-btn.active { color: var(--accent); }
+
+    .tab-page { display: none; }
+    .tab-page.active { display: block; }
+
+    /* ── Scan tab ───────────────────────────────────────────── */
+    .scan-page { padding: 14px; padding-bottom: 80px; }
+
+    .scan-drop {
+      border: 2px dashed var(--border);
+      border-radius: 14px;
+      padding: 32px 20px;
+      text-align: center;
+      background: white;
+      cursor: pointer;
+      margin-bottom: 14px;
+    }
+    .scan-drop:active { background: var(--accent-light); border-color: var(--accent); }
+    .scan-drop .scan-icon { font-size: 48px; margin-bottom: 8px; }
+    .scan-drop p { font-size: 14px; color: var(--muted); line-height: 1.5; }
+    .scan-drop strong { color: var(--text); }
+
+    .scan-preview {
+      width: 100%;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      display: none;
+      max-height: 240px;
+      object-fit: contain;
+      background: #000;
+    }
+
+    .scan-actions { display: flex; gap: 8px; margin-bottom: 14px; }
+    .scan-btn {
+      flex: 1; padding: 12px; border-radius: 10px; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .scan-btn.primary { background: var(--accent); color: white; }
+    .scan-btn.secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+    .scan-btn:disabled { opacity: 0.4; pointer-events: none; }
+    .scan-btn:active { opacity: 0.75; }
+
+    .scan-result {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .scan-result-label {
+      font-size: 11px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+    }
+    .scan-result-text {
+      font-size: 14px; line-height: 1.6; color: var(--text);
+      white-space: pre-wrap;
+    }
+    .scan-save-row {
+      display: flex; gap: 8px; align-items: center; margin-top: 12px;
+    }
+    .scan-save-row select {
+      flex: 1; padding: 9px 10px; border: 1px solid var(--border);
+      border-radius: 8px; font-size: 13px; background: white; color: var(--text);
+    }
+    .scan-save-btn {
+      padding: 9px 16px; background: var(--success); color: white;
+      border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .scan-save-btn:active { opacity: 0.75; }
+
+    .scan-history { margin-top: 4px; }
+    .scan-history-title {
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+    }
+    .scan-item {
+      background: white; border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 12px; margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start;
+    }
+    .scan-item-thumb {
+      width: 48px; height: 48px; border-radius: 6px; object-fit: cover; flex-shrink: 0;
+    }
+    .scan-item-body { flex: 1; min-width: 0; }
+    .scan-item-time { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+    .scan-item-text { font-size: 13px; color: var(--text); line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .scan-item-del { background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; padding: 0; flex-shrink: 0; }
+    .scan-item-del:active { color: var(--danger); }
+
+    .scan-loading {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px; font-size: 14px; color: var(--muted);
+    }
   </style>
 </head>
 <body>
@@ -392,14 +511,62 @@
   <button class="header-settings" onclick="openSettings()" title="Instellingen">⚙️</button>
 </header>
 
-<div class="toolbar">
-  <button class="primary" onclick="addBlock()">＋ Nieuw blok</button>
-  <button onclick="collapseAll()">▲ Inklappen</button>
-  <button onclick="expandAll()">▼ Uitklappen</button>
-  <button onclick="openExport()">↗ Exporteer</button>
+<!-- Tab: Aantekeningen -->
+<div class="tab-page active" id="tab-notes">
+  <div class="toolbar">
+    <button class="primary" onclick="addBlock()">＋ Nieuw blok</button>
+    <button onclick="collapseAll()">▲ Inklappen</button>
+    <button onclick="expandAll()">▼ Uitklappen</button>
+    <button onclick="openExport()">↗ Exporteer</button>
+  </div>
+  <div class="blocks" id="blocks"></div>
 </div>
 
-<div class="blocks" id="blocks"></div>
+<!-- Tab: Documenten scannen -->
+<div class="tab-page" id="tab-scan">
+  <div class="scan-page">
+    <input type="file" id="scan-input" accept="image/*" capture="environment" style="display:none" onchange="onScanFile(this)">
+
+    <div class="scan-drop" onclick="document.getElementById('scan-input').click()">
+      <div class="scan-icon">📷</div>
+      <p><strong>Tik om foto te maken</strong><br>of kies een afbeelding uit je galerij</p>
+    </div>
+
+    <img id="scan-preview" class="scan-preview" alt="Preview">
+
+    <div class="scan-actions" id="scan-actions" style="display:none">
+      <button class="scan-btn secondary" onclick="resetScan()">✕ Wis</button>
+      <button class="scan-btn primary" id="scan-analyze-btn" onclick="analyzeScan()">✨ Analyseer</button>
+    </div>
+
+    <div id="scan-loading" class="scan-loading" style="display:none">
+      <div class="spinner"></div> Claude analyseert het document…
+    </div>
+
+    <div class="scan-result" id="scan-result">
+      <div class="scan-result-label">✨ Geëxtraheerde tekst</div>
+      <div class="scan-result-text" id="scan-result-text"></div>
+      <div class="scan-save-row">
+        <select id="scan-block-select">
+          <option value="">— Sla op in blok —</option>
+        </select>
+        <button class="scan-save-btn" onclick="saveScanToBlock()">Opslaan</button>
+      </div>
+    </div>
+
+    <div class="scan-history" id="scan-history"></div>
+  </div>
+</div>
+
+<!-- Tab bar -->
+<nav class="tab-bar">
+  <button class="tab-btn active" id="tabbtn-notes" onclick="switchTab('notes')">
+    <span class="tab-icon">📓</span>Aantekeningen
+  </button>
+  <button class="tab-btn" id="tabbtn-scan" onclick="switchTab('scan')">
+    <span class="tab-icon">📄</span>Documenten
+  </button>
+</nav>
 
 <!-- Export sheet -->
 <div class="overlay" id="export-overlay" onclick="closeExportIfOutside(event)">
@@ -863,6 +1030,167 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     render();
   }
 
+  // ─── Tab navigation ──────────────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    document.getElementById('tabbtn-' + name).classList.add('active');
+    if (name === 'scan') renderScanBlockSelect();
+  }
+
+  // ─── Document scan ───────────────────────────────────────────────────────
+  let scanImageBase64 = null;
+  let scanImageMime = 'image/jpeg';
+
+  function onScanFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    scanImageMime = file.type || 'image/jpeg';
+    const reader = new FileReader();
+    reader.onload = e => {
+      const dataUrl = e.target.result;
+      scanImageBase64 = dataUrl.split(',')[1];
+      const preview = document.getElementById('scan-preview');
+      preview.src = dataUrl;
+      preview.style.display = 'block';
+      document.getElementById('scan-actions').style.display = 'flex';
+      document.getElementById('scan-result').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+  }
+
+  function resetScan() {
+    scanImageBase64 = null;
+    document.getElementById('scan-preview').style.display = 'none';
+    document.getElementById('scan-actions').style.display = 'none';
+    document.getElementById('scan-result').style.display = 'none';
+    document.getElementById('scan-loading').style.display = 'none';
+  }
+
+  async function analyzeScan() {
+    const apiKey = localStorage.getItem('seminar-api-key');
+    if (!apiKey) {
+      alert('Voer eerst een Anthropic API sleutel in via ⚙️ instellingen.');
+      return;
+    }
+    if (!scanImageBase64) return;
+
+    document.getElementById('scan-loading').style.display = 'flex';
+    document.getElementById('scan-analyze-btn').disabled = true;
+    document.getElementById('scan-result').style.display = 'none';
+
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1500,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: scanImageMime, data: scanImageBase64 },
+              },
+              {
+                type: 'text',
+                text: 'Transcribeer alle tekst die je ziet in dit document of op deze foto. Zet het neer als gestructureerde aantekeningen in het Nederlands. Gebruik bullets voor losse punten. Als er geen tekst is, beschrijf dan kort wat je ziet.',
+              },
+            ],
+          }],
+        }),
+      });
+
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const text = data.content?.[0]?.text?.trim() || '(geen tekst gevonden)';
+
+      document.getElementById('scan-result-text').textContent = text;
+      document.getElementById('scan-result').style.display = 'block';
+
+      // Save to history
+      saveScanHistory(scanImageBase64, scanImageMime, text);
+      renderScanHistory();
+    } catch (err) {
+      alert('Fout bij analyseren: ' + err.message);
+    } finally {
+      document.getElementById('scan-loading').style.display = 'none';
+      document.getElementById('scan-analyze-btn').disabled = false;
+    }
+  }
+
+  function renderScanBlockSelect() {
+    const sel = document.getElementById('scan-block-select');
+    sel.innerHTML = '<option value="">— Sla op in blok —</option>';
+    blocks.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b.id;
+      opt.textContent = b.title || '(naamloos blok)';
+      sel.appendChild(opt);
+    });
+  }
+
+  function saveScanToBlock() {
+    const blockId = document.getElementById('scan-block-select').value;
+    const text = document.getElementById('scan-result-text').textContent;
+    if (!blockId || !text) return;
+    const b = blocks.find(b => b.id === blockId);
+    if (!b) return;
+    b.notes.push({ id: uid(), text });
+    save();
+    render();
+    document.getElementById('scan-block-select').value = '';
+    alert('✓ Opgeslagen in blok "' + (b.title || 'naamloos') + '"');
+  }
+
+  // Scan history (localStorage)
+  function saveScanHistory(b64, mime, text) {
+    const history = getScanHistory();
+    history.unshift({
+      id: uid(),
+      time: Date.now(),
+      thumb: `data:${mime};base64,${b64.slice(0, 200)}`,  // tiny stub for display
+      img: `data:${mime};base64,${b64}`,
+      text,
+    });
+    localStorage.setItem('scan-history', JSON.stringify(history.slice(0, 20)));
+  }
+
+  function getScanHistory() {
+    try { return JSON.parse(localStorage.getItem('scan-history') || '[]'); } catch { return []; }
+  }
+
+  function deleteScanItem(id) {
+    const h = getScanHistory().filter(i => i.id !== id);
+    localStorage.setItem('scan-history', JSON.stringify(h));
+    renderScanHistory();
+  }
+
+  function renderScanHistory() {
+    const history = getScanHistory();
+    const el = document.getElementById('scan-history');
+    if (history.length === 0) { el.innerHTML = ''; return; }
+    el.innerHTML = `<div class="scan-history-title">Eerder gescand</div>` +
+      history.map(item => `
+        <div class="scan-item">
+          <img class="scan-item-thumb" src="${item.img}" alt="">
+          <div class="scan-item-body">
+            <div class="scan-item-time">${new Date(item.time).toLocaleTimeString('nl-NL', {hour:'2-digit',minute:'2-digit'})}</div>
+            <div class="scan-item-text">${escHtml(item.text)}</div>
+          </div>
+          <button class="scan-item-del" onclick="deleteScanItem('${item.id}')">✕</button>
+        </div>`
+      ).join('');
+  }
+
   // ─── PWA & Push ──────────────────────────────────────────────────────────
   const VAPID_PUBLIC = 'BNP__rx43zkGmdtX7HCc6f3U0Cx8e0vwxRNqrawuGPpJZporDj2hUtUBQ4Y4sHa14vAAD-NJslma2D3I8brmy_Q';
   let swReg = null;
@@ -931,6 +1259,7 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
   document.getElementById('header-date').textContent = `Ben Tichelaar MBA — ${today}`;
   initPWA();
   load();
+  renderScanHistory();
 </script>
 </body>
 </html>
