@@ -1332,17 +1332,17 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
         body: bytes.buffer,
       });
 
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        const code = err.error?.code || err.statusCode || '';
-        const msg  = err.error?.message || err.message || 'Onbekende fout';
-        throw new Error(`HTTP ${resp.status}${code ? ' (' + code + ')' : ''}: ${msg}`);
+      let azureRaw;
+      try { azureRaw = await resp.json(); } catch (_) { azureRaw = {}; }
+
+      if (!resp.ok || azureRaw.error || azureRaw.code) {
+        const status = resp.status;
+        const code   = azureRaw.error?.code   || azureRaw.code   || '';
+        const msg    = azureRaw.error?.message || azureRaw.message || '(geen details)';
+        throw new Error(`HTTP ${status}${code ? '\nCode: ' + code : ''}\nBericht: ${msg}\n\nVolledige Azure respons:\n${JSON.stringify(azureRaw, null, 2)}`);
       }
 
-      const data = await resp.json();
-      if (data.error) {
-        throw new Error(`Azure fout ${data.error.code || ''}: ${data.error.message || JSON.stringify(data.error)}`);
-      }
+      const data = azureRaw;
 
       // Flatten Azure OCR response to plain text (double newline between regions preserves document structure)
       const text = (data.regions || [])
@@ -1710,7 +1710,8 @@ JSON:
       const keys = await caches.keys();
       await Promise.all(keys.map(k => caches.delete(k)));
     } catch (_) {}
-    location.reload(true);
+    // Voeg timestamp toe zodat browser de pagina écht opnieuw ophaalt (omzeilt SW-cache)
+    location.href = location.pathname + '?v=' + Date.now();
   }
 
   async function initPWA() {
