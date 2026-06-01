@@ -37,6 +37,15 @@ export default {
     if (pathname === '/notify' && request.method === 'POST') {
       return handleNotify(request, env);
     }
+    if (pathname === '/scan' && request.method === 'POST') {
+      return handleScanPost(request, env);
+    }
+    if (pathname === '/scans' && request.method === 'GET') {
+      return handleScansGet(request, env);
+    }
+    if (pathname.startsWith('/scan/') && request.method === 'DELETE') {
+      return handleScanDelete(pathname.slice(6), request, env);
+    }
 
     return new Response('Not Found', { status: 404, headers: CORS });
   },
@@ -103,6 +112,37 @@ async function sendPush(subscription, env) {
   if (!res.ok && res.status !== 201) {
     throw new Error(`Push HTTP ${res.status}`);
   }
+}
+
+async function handleScanPost(request, env) {
+  const scan = await request.json();
+  const key = `scan-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+  await env.SUBS.put(key, JSON.stringify({ ...scan, _key: key }), { expirationTtl: 60 * 60 * 24 * 90 });
+  return new Response(JSON.stringify({ id: key }), { headers: { ...CORS, 'Content-Type': 'application/json' } });
+}
+
+async function handleScansGet(request, env) {
+  const auth = request.headers.get('Authorization') || '';
+  if (auth !== `Bearer ${env.ADMIN_KEY}`) {
+    return new Response('Unauthorized', { status: 401, headers: CORS });
+  }
+  const { keys } = await env.SUBS.list({ prefix: 'scan-' });
+  const scans = (await Promise.all(
+    keys.map(async ({ name }) => {
+      const v = await env.SUBS.get(name);
+      return v ? JSON.parse(v) : null;
+    })
+  )).filter(Boolean).sort((a, b) => b.time - a.time);
+  return new Response(JSON.stringify(scans), { headers: { ...CORS, 'Content-Type': 'application/json' } });
+}
+
+async function handleScanDelete(key, request, env) {
+  const auth = request.headers.get('Authorization') || '';
+  if (auth !== `Bearer ${env.ADMIN_KEY}`) {
+    return new Response('Unauthorized', { status: 401, headers: CORS });
+  }
+  await env.SUBS.delete(`scan-${key}`);
+  return new Response('OK', { headers: CORS });
 }
 
 async function createVapidJwt(audience, env) {

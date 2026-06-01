@@ -544,6 +544,18 @@
     </div>
 
     <div class="scan-result" id="scan-result">
+      <!-- Financial data card -->
+      <div id="scan-financial-card" style="display:none; background:#fffbeb; border:1px solid #f6e05e; border-radius:8px; padding:12px; margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:700;color:#b7791f;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">💰 Financiële gegevens</div>
+        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+          <tr><td style="color:#718096;padding:3px 0;width:110px;">Schuldeiser</td><td id="sf-creditor" style="font-weight:600;color:#1a202c;"></td></tr>
+          <tr><td style="color:#718096;padding:3px 0;">Adres</td><td id="sf-address" style="color:#1a202c;"></td></tr>
+          <tr><td style="color:#718096;padding:3px 0;">Contact</td><td id="sf-contact" style="color:#1a202c;"></td></tr>
+          <tr><td style="color:#718096;padding:3px 0;">Openst. schuld</td><td id="sf-amount" style="font-weight:700;color:#e53e3e;font-size:15px;"></td></tr>
+          <tr><td style="color:#718096;padding:3px 0;">Vervaldatum</td><td id="sf-due" style="color:#1a202c;"></td></tr>
+          <tr><td style="color:#718096;padding:3px 0;">Referentie</td><td id="sf-ref" style="color:#1a202c;"></td></tr>
+        </table>
+      </div>
       <div class="scan-result-label">✨ Geëxtraheerde tekst</div>
       <div class="scan-result-text" id="scan-result-text"></div>
       <div class="scan-save-row">
@@ -1071,10 +1083,7 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
 
   async function analyzeScan() {
     const apiKey = localStorage.getItem('seminar-api-key');
-    if (!apiKey) {
-      alert('Voer eerst een Anthropic API sleutel in via ⚙️ instellingen.');
-      return;
-    }
+    if (!apiKey) { alert('Voer eerst een Anthropic API sleutel in via ⚙️ instellingen.'); return; }
     if (!scanImageBase64) return;
 
     document.getElementById('scan-loading').style.display = 'flex';
@@ -1092,18 +1101,27 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1500,
+          max_tokens: 2000,
           messages: [{
             role: 'user',
             content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: scanImageMime, data: scanImageBase64 },
-              },
-              {
-                type: 'text',
-                text: 'Transcribeer alle tekst die je ziet in dit document of op deze foto. Zet het neer als gestructureerde aantekeningen in het Nederlands. Gebruik bullets voor losse punten. Als er geen tekst is, beschrijf dan kort wat je ziet.',
-              },
+              { type: 'image', source: { type: 'base64', media_type: scanImageMime, data: scanImageBase64 } },
+              { type: 'text', text: `Analyseer dit document zorgvuldig. Geef je antwoord in exact dit formaat:
+
+TEKST:
+[transcribeer alle tekst uit het document woordelijk]
+
+JSON:
+{
+  "is_financial": true of false,
+  "debt_amount": "openstaand bedrag inclusief valuta, bijv. € 1.234,56" of null,
+  "creditor_name": "naam van de schuldeiser of afzender" of null,
+  "creditor_address": "volledig adres van schuldeiser" of null,
+  "creditor_contact": "telefoon of email van schuldeiser" of null,
+  "due_date": "uiterste betaaldatum" of null,
+  "reference": "referentie- of factuurnummer" of null,
+  "summary": "één zin samenvatting van het document"
+}` },
             ],
           }],
         }),
@@ -1111,14 +1129,55 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
 
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
-      const text = data.content?.[0]?.text?.trim() || '(geen tekst gevonden)';
+      const raw = data.content?.[0]?.text?.trim() || '';
 
-      document.getElementById('scan-result-text').textContent = text;
+      // Parse TEKST and JSON sections
+      const textMatch = raw.match(/TEKST:\s*([\s\S]*?)(?=\nJSON:|$)/i);
+      const jsonMatch = raw.match(/JSON:\s*(\{[\s\S]*\})/i);
+
+      const extractedText = textMatch ? textMatch[1].trim() : raw;
+      let structured = null;
+      if (jsonMatch) {
+        try { structured = JSON.parse(jsonMatch[1]); } catch (_) {}
+      }
+
+      // Show text result
+      document.getElementById('scan-result-text').textContent = extractedText;
+
+      // Show financial card if applicable
+      const card = document.getElementById('scan-financial-card');
+      if (structured?.is_financial) {
+        document.getElementById('sf-amount').textContent   = structured.debt_amount   || '—';
+        document.getElementById('sf-creditor').textContent = structured.creditor_name  || '—';
+        document.getElementById('sf-address').textContent  = structured.creditor_address || '—';
+        document.getElementById('sf-contact').textContent  = structured.creditor_contact || '—';
+        document.getElementById('sf-due').textContent      = structured.due_date       || '—';
+        document.getElementById('sf-ref').textContent      = structured.reference      || '—';
+        card.style.display = 'block';
+      } else {
+        card.style.display = 'none';
+      }
+
       document.getElementById('scan-result').style.display = 'block';
 
-      // Save to history
-      saveScanHistory(scanImageBase64, scanImageMime, text);
+      // Save locally
+      const scanEntry = {
+        id: uid(), time: Date.now(),
+        img: `data:${scanImageMime};base64,${scanImageBase64}`,
+        text: extractedText, structured,
+      };
+      saveScanHistory(scanEntry);
       renderScanHistory();
+
+      // Send to worker if URL is set
+      const workerUrl = localStorage.getItem('seminar-worker-url');
+      if (workerUrl) {
+        fetch(`${workerUrl}/scan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...scanEntry, img: `data:${scanImageMime};base64,${scanImageBase64.slice(0,5000)}` }),
+        }).catch(() => {});
+      }
     } catch (err) {
       alert('Fout bij analyseren: ' + err.message);
     } finally {
@@ -1152,15 +1211,9 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
   }
 
   // Scan history (localStorage)
-  function saveScanHistory(b64, mime, text) {
+  function saveScanHistory(entry) {
     const history = getScanHistory();
-    history.unshift({
-      id: uid(),
-      time: Date.now(),
-      thumb: `data:${mime};base64,${b64.slice(0, 200)}`,  // tiny stub for display
-      img: `data:${mime};base64,${b64}`,
-      text,
-    });
+    history.unshift(entry);
     localStorage.setItem('scan-history', JSON.stringify(history.slice(0, 20)));
   }
 
@@ -1179,16 +1232,22 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     const el = document.getElementById('scan-history');
     if (history.length === 0) { el.innerHTML = ''; return; }
     el.innerHTML = `<div class="scan-history-title">Eerder gescand</div>` +
-      history.map(item => `
-        <div class="scan-item">
-          <img class="scan-item-thumb" src="${item.img}" alt="">
-          <div class="scan-item-body">
-            <div class="scan-item-time">${new Date(item.time).toLocaleTimeString('nl-NL', {hour:'2-digit',minute:'2-digit'})}</div>
-            <div class="scan-item-text">${escHtml(item.text)}</div>
-          </div>
-          <button class="scan-item-del" onclick="deleteScanItem('${item.id}')">✕</button>
-        </div>`
-      ).join('');
+      history.map(item => {
+        const s = item.structured;
+        const financialBadge = s?.is_financial && s?.debt_amount
+          ? `<div style="font-size:12px;font-weight:700;color:#e53e3e;margin-top:3px;">💰 ${escHtml(s.debt_amount)}${s.creditor_name ? ' · ' + escHtml(s.creditor_name) : ''}</div>`
+          : '';
+        return `
+          <div class="scan-item">
+            <img class="scan-item-thumb" src="${item.img}" alt="">
+            <div class="scan-item-body">
+              <div class="scan-item-time">${new Date(item.time).toLocaleTimeString('nl-NL', {hour:'2-digit',minute:'2-digit'})}</div>
+              ${financialBadge}
+              <div class="scan-item-text">${escHtml(item.text)}</div>
+            </div>
+            <button class="scan-item-del" onclick="deleteScanItem('${item.id}')">✕</button>
+          </div>`;
+      }).join('');
   }
 
   // ─── PWA & Push ──────────────────────────────────────────────────────────

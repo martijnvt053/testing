@@ -73,6 +73,50 @@
     .result.ok { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
     .result.err { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
 
+    .scans-section { margin-top: 28px; }
+    .scans-section h2 { font-size: 16px; color: #1a202c; margin-bottom: 4px; }
+    .scans-sub { font-size: 13px; color: #718096; margin-bottom: 14px; }
+    .scans-refresh {
+      background: none; border: 1px solid #e2e8f0; border-radius: 8px;
+      padding: 6px 12px; font-size: 13px; cursor: pointer; color: #718096; margin-bottom: 14px;
+    }
+    .scans-refresh:active { opacity: 0.7; }
+
+    .scan-card {
+      background: white; border: 1px solid #e2e8f0; border-radius: 12px;
+      padding: 14px; margin-bottom: 12px; position: relative;
+    }
+    .scan-card.financial { border-color: #f6ad55; }
+    .scan-card-header { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
+    .scan-thumb { width: 56px; height: 56px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+    .scan-meta { flex: 1; min-width: 0; }
+    .scan-time { font-size: 11px; color: #718096; margin-bottom: 4px; }
+    .scan-del-btn {
+      background: none; border: none; color: #ccc; font-size: 20px;
+      cursor: pointer; padding: 0; flex-shrink: 0;
+    }
+    .scan-del-btn:active { color: #e53e3e; }
+
+    .financial-box {
+      background: #fffbeb; border: 1px solid #f6e05e; border-radius: 8px;
+      padding: 10px 12px; margin-bottom: 10px;
+    }
+    .financial-box .fb-label {
+      font-size: 11px; font-weight: 700; color: #b7791f;
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+    }
+    .financial-box table { width: 100%; font-size: 13px; border-collapse: collapse; }
+    .financial-box td { padding: 2px 0; vertical-align: top; }
+    .financial-box .fb-key { color: #718096; width: 110px; }
+    .financial-box .fb-amount { font-weight: 700; color: #e53e3e; font-size: 15px; }
+
+    .scan-text-preview {
+      font-size: 12px; color: #718096; line-height: 1.5;
+      overflow: hidden; display: -webkit-box;
+      -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    }
+    .scans-empty { text-align: center; padding: 32px; color: #718096; font-size: 14px; }
+
     .divider { border: none; border-top: 1px solid #e2e8f0; margin: 20px 0; }
 
     .config-toggle {
@@ -105,6 +149,14 @@
 
   <div class="result" id="result"></div>
 
+  <!-- Scanned documents section -->
+  <div class="scans-section">
+    <h2>📄 Gescande documenten</h2>
+    <p class="scans-sub">Documenten gescand via de seminar app</p>
+    <button class="scans-refresh" onclick="loadScans()">↻ Vernieuwen</button>
+    <div id="scans-list"></div>
+  </div>
+
   <hr class="divider">
 
   <button class="config-toggle" onclick="toggleConfig()">⚙️ Instellingen</button>
@@ -124,6 +176,78 @@
   function load() {
     document.getElementById('worker-url').value = localStorage.getItem('admin-worker-url') || '';
     document.getElementById('admin-key').value = localStorage.getItem('admin-key') || '';
+    loadScans();
+  }
+
+  async function loadScans() {
+    const workerUrl = localStorage.getItem('admin-worker-url');
+    const adminKey = localStorage.getItem('admin-key');
+    const el = document.getElementById('scans-list');
+    if (!workerUrl || !adminKey) {
+      el.innerHTML = '<p class="scans-empty">Stel eerst de Worker URL en admin sleutel in via ⚙️ instellingen.</p>';
+      return;
+    }
+    el.innerHTML = '<p class="scans-empty">Laden…</p>';
+    try {
+      const resp = await fetch(`${workerUrl}/scans`, {
+        headers: { 'Authorization': `Bearer ${adminKey}` }
+      });
+      if (!resp.ok) throw new Error(resp.status);
+      const scans = await resp.json();
+      renderScans(scans);
+    } catch (e) {
+      el.innerHTML = `<p class="scans-empty">Kon scans niet laden: ${e.message}</p>`;
+    }
+  }
+
+  function renderScans(scans) {
+    const el = document.getElementById('scans-list');
+    if (!scans.length) { el.innerHTML = '<p class="scans-empty">Nog geen gescande documenten.</p>'; return; }
+    el.innerHTML = scans.map(s => {
+      const st = s.structured || {};
+      const isFinancial = st.is_financial && (st.debt_amount || st.creditor_name);
+      const financialHtml = isFinancial ? `
+        <div class="financial-box">
+          <div class="fb-label">💰 Financiële gegevens</div>
+          <table>
+            <tr><td class="fb-key">Schuldeiser</td><td><strong>${esc(st.creditor_name || '—')}</strong></td></tr>
+            <tr><td class="fb-key">Adres</td><td>${esc(st.creditor_address || '—')}</td></tr>
+            <tr><td class="fb-key">Contact</td><td>${esc(st.creditor_contact || '—')}</td></tr>
+            <tr><td class="fb-key">Openst. schuld</td><td class="fb-amount">${esc(st.debt_amount || '—')}</td></tr>
+            <tr><td class="fb-key">Vervaldatum</td><td>${esc(st.due_date || '—')}</td></tr>
+            <tr><td class="fb-key">Referentie</td><td>${esc(st.reference || '—')}</td></tr>
+          </table>
+        </div>` : '';
+      const scanKey = (s._key || s.id || '').replace('scan-', '');
+      return `
+        <div class="scan-card ${isFinancial ? 'financial' : ''}">
+          <div class="scan-card-header">
+            <img class="scan-thumb" src="${s.img || ''}" alt="">
+            <div class="scan-meta">
+              <div class="scan-time">${new Date(s.time).toLocaleString('nl-NL', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+              <div style="font-size:13px;color:#1a202c;">${esc(st.summary || s.text?.slice(0,60) || '')}</div>
+            </div>
+            <button class="scan-del-btn" onclick="deleteScan('${scanKey}', this)">✕</button>
+          </div>
+          ${financialHtml}
+          <div class="scan-text-preview">${esc(s.text || '')}</div>
+        </div>`;
+    }).join('');
+  }
+
+  async function deleteScan(key, btn) {
+    const workerUrl = localStorage.getItem('admin-worker-url');
+    const adminKey = localStorage.getItem('admin-key');
+    btn.closest('.scan-card').style.opacity = '0.4';
+    await fetch(`${workerUrl}/scan/${key}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${adminKey}` }
+    }).catch(() => {});
+    loadScans();
+  }
+
+  function esc(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
   function saveConfig() {
