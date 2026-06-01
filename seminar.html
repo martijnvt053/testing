@@ -1338,11 +1338,12 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
 
       const data = await resp.json();
 
-      // Flatten Azure OCR response to plain text
+      // Flatten Azure OCR response to plain text (double newline between regions preserves document structure)
       const text = (data.regions || [])
-        .flatMap(r => r.lines || [])
-        .map(l => (l.words || []).map(w => w.text).join(' '))
-        .join('\n');
+        .map(r => (r.lines || [])
+          .map(l => (l.words || []).map(w => w.text).join(' '))
+          .join('\n'))
+        .join('\n\n');
 
       const structured = extractFinancialFromText(text);
       showScanResult(text.trim(), structured);
@@ -1497,50 +1498,89 @@ JSON:
 
   function extractFinancialFromText(text) {
     const s = { is_financial: false, summary: null };
+    const lower = text.toLowerCase();
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-    // Bedrag: zoek naar € of EUR patronen
-    const amountMatches = [...text.matchAll(/€\s*([\d.,]+)/g)];
-    const eurMatches    = [...text.matchAll(/([\d.,]+)\s*euro/gi)];
-    if (amountMatches.length > 0) {
-      // Kies het grootste bedrag
-      const amounts = amountMatches.map(m => ({ raw: '€ ' + m[1], val: parseFloat(m[1].replace(/\./g,'').replace(',','.')) }));
-      amounts.sort((a, b) => b.val - a.val);
-      s.debt_amount = amounts[0].raw;
-      s.is_financial = true;
-    } else if (eurMatches.length > 0) {
-      s.debt_amount = eurMatches[0][1] + ' euro';
+    // ── Bedrag ────────────────────────────────────────────────────────────────
+    const allAmounts = [
+      ...[...text.matchAll(/€\s*([\d.]+(?:,\d{1,2})?)/g)].map(m => ({ display: '€ ' + m[1], val: parseFloat(m[1].replace(/\./g, '').replace(',', '.')) })),
+      ...[...text.matchAll(/\b([\d.]+(?:,\d{1,2})?)\s*(?:euro|EUR)\b/gi)].map(m => ({ display: '€ ' + m[1], val: parseFloat(m[1].replace(/\./g, '').replace(',', '.')) })),
+    ].filter(a => !isNaN(a.val) && a.val > 0);
+    if (allAmounts.length > 0) {
+      allAmounts.sort((a, b) => b.val - a.val);
+      s.debt_amount = allAmounts[0].display;
       s.is_financial = true;
     }
 
-    // Referentienummer
-    const refMatch = text.match(/(?:kenmerk|referentie|factuurnummer|betalingskenmerk|ons kenmerk|ref\.?)[:\s]+([A-Z0-9\-\/\.]{4,30})/i);
-    if (refMatch) s.reference = refMatch[1].trim();
+    // ── IBAN ──────────────────────────────────────────────────────────────────
+    const ibanMatch = text.match(/\b(NL\d{2}[A-Z]{4}\d{10}|[A-Z]{2}\d{2}(?:[A-Z0-9]{4}\s?){2,7})\b/);
+    if (ibanMatch) {
+      s.iban = ibanMatch[1].replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim();
+      s.is_financial = true;
+    }
 
-    // Vervaldatum
-    const dueMatch = text.match(/(?:vervaldatum|uiterlijk|betalen voor|vóór|voor)[:\s]+(\d{1,2}[-\s\/]\d{1,2}[-\s\/]\d{2,4}|\d{1,2}\s+\w+\s+\d{4})/i);
+    // ── Referentienummer ──────────────────────────────────────────────────────
+    const refPat = /(?:kenmerk|betalingskenmerk|referentie|factuurnummer|factnr|fact\.?\s*nr\.?|ordernr\.?|order nr\.?|ons kenmerk|uw kenmerk|ref(?:erentie)?(?:nr)?\.?)[:\s#]+([A-Z0-9][A-Z0-9\-\/\.\s]{2,29})/i;
+    const refMatch = text.match(refPat);
+    if (refMatch) s.reference = refMatch[1].trim().split('\n')[0].trim();
+
+    // ── Vervaldatum ───────────────────────────────────────────────────────────
+    const duePat = /(?:vervaldatum|uiterste betaaldatum|uiterlijk betalen|te betalen voor|betalen voor|betalen v[oó][oó]r|v[oó][oó]r|uiterlijk)[:\s]+(\d{1,2}[\s\-\/]\d{1,2}[\s\-\/]\d{2,4}|\d{1,2}\s+\w{3,9}\.?\s+\d{4})/i;
+    const dueMatch = text.match(duePat);
     if (dueMatch) s.due_date = dueMatch[1].trim();
 
-    // Schuldeiser: eerste niet-lege regel die er als bedrijfsnaam uitziet
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2 && l.length < 60 && !/^\d/.test(l));
-    if (lines.length > 0) s.creditor_name = lines[0];
-
-    // Adres: zoek postcode-patroon
-    const addrMatch = text.match(/([A-Za-z '\-]+)\n?\s*(\d{4}\s?[A-Z]{2})\s+([A-Za-z\s]+)/);
-    if (addrMatch) s.creditor_address = `${addrMatch[1].trim()}, ${addrMatch[2]} ${addrMatch[3].trim()}`;
-
-    // Email en telefoon
-    const emailMatch = text.match(/[\w.+-]+@[\w-]+\.\w+/);
-    if (emailMatch) s.creditor_contact = emailMatch[0];
-    const telMatch = text.match(/(?:tel\.?|telefoon)[:\s]*([\d\s\-\+\(\)]{8,})/i);
-    if (telMatch && !s.creditor_contact) s.creditor_contact = telMatch[1].trim();
-
-    // IBAN rekeningnummer
-    const ibanMatch = text.match(/\b([A-Z]{2}\d{2}[\s]?(?:[A-Z0-9]{4}[\s]?){1,7}[A-Z0-9]{1,4})\b/);
-    if (ibanMatch) s.iban = ibanMatch[1].replace(/\s/g, ' ').trim();
-
-    if (s.is_financial) {
-      s.summary = `Schulddocument${s.creditor_name ? ' van ' + s.creditor_name : ''}${s.debt_amount ? ' · ' + s.debt_amount : ''}`;
+    // ── Schuldeiser naam ──────────────────────────────────────────────────────
+    const senderMatch = text.match(/(?:^|\n)(?:van|afzender|schuldeiser|crediteur)[:\s]+(.{2,60})/im);
+    if (senderMatch) {
+      s.creditor_name = senderMatch[1].trim().split('\n')[0].trim();
     }
+    if (!s.creditor_name) {
+      const companyLine = lines.find(l =>
+        /\b(B\.?V\.?|N\.?V\.?|V\.?O\.?F\.?|stichting|incasso|gerechtsdeurwaarder|deurwaarder|holding|groep|group|Ltd|GmbH)\b/i.test(l)
+        && l.length < 70
+      );
+      if (companyLine) s.creditor_name = companyLine;
+    }
+    if (!s.creditor_name) {
+      const stopWords = /^(datum|aan|van|betreft|re|subject|dear|geachte|beste|kenmerk|iban|btw|kvk|t\.a\.v|postbus|p\.o\.box|\d)/i;
+      const nameLine = lines.find(l => l.length > 3 && l.length < 60 && !stopWords.test(l) && /[a-z]/i.test(l));
+      if (nameLine) s.creditor_name = nameLine;
+    }
+
+    // ── Adres ─────────────────────────────────────────────────────────────────
+    const addrPat = /([\w\s'\-\.À-ÿ]+\s+\d+[\w]*)\n\s*(\d{4}\s?[A-Z]{2})\s+([\w\s\-À-ÿ]+?)(?:\n|$)/;
+    const addrMatch = text.match(addrPat);
+    if (addrMatch) {
+      s.creditor_address = `${addrMatch[1].trim()}, ${addrMatch[2].trim()} ${addrMatch[3].trim()}`;
+    } else {
+      const pcMatch = text.match(/(\d{4}\s?[A-Z]{2})\s+([\w\s\-À-ÿ]{2,30}?)(?:\n|,|$)/);
+      if (pcMatch) s.creditor_address = `${pcMatch[1]} ${pcMatch[2].trim()}`;
+    }
+
+    // ── Contact (email / telefoon) ────────────────────────────────────────────
+    const emailMatch = text.match(/[\w.+\-]+@[\w\-]+(?:\.[\w\-]+)+/);
+    if (emailMatch) s.creditor_contact = emailMatch[0];
+    if (!s.creditor_contact) {
+      const telMatch = text.match(/(?:tel(?:efoon)?\.?|t\.?|phone|mob(?:iel)?\.?)[:\s]*([\+\d][\d\s\-\(\)\.]{6,20})/i);
+      if (telMatch) s.creditor_contact = telMatch[1].trim().replace(/\s+/g, ' ');
+    }
+
+    // ── Financieel document herkend op trefwoorden ────────────────────────────
+    if (!s.is_financial) {
+      const kwds = ['factuur', 'rekening', 'schuld', 'vordering', 'incasso',
+        'betalingsherinnering', 'aanmaning', 'herinnering', 'openstaand',
+        'te betalen', 'invoice', 'overdue', 'deurwaarder', 'creditnota'];
+      if (kwds.some(kw => lower.includes(kw))) s.is_financial = true;
+    }
+
+    // ── Samenvatting ──────────────────────────────────────────────────────────
+    if (s.is_financial) {
+      const parts = [];
+      if (s.creditor_name) parts.push('van ' + s.creditor_name);
+      if (s.debt_amount) parts.push(s.debt_amount);
+      s.summary = 'Schulddocument' + (parts.length ? ' ' + parts.join(' · ') : '');
+    }
+
     return s;
   }
 
