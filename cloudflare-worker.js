@@ -37,6 +37,15 @@ export default {
     if (pathname === '/notify' && request.method === 'POST') {
       return handleNotify(request, env);
     }
+    if (pathname === '/scan' && request.method === 'POST') {
+      return handleScanPost(request, env);
+    }
+    if (pathname === '/scans' && request.method === 'GET') {
+      return handleScansGet(request, env);
+    }
+    if (pathname.startsWith('/scan/') && request.method === 'DELETE') {
+      return handleScanDelete(pathname.slice(6), request, env);
+    }
 
     return new Response('Not Found', { status: 404, headers: CORS });
   },
@@ -131,62 +140,58 @@ async function encryptPayload(p256dhB64, authB64, message) {
   const authBytes  = b64urlDecode(authB64);
   const plaintext  = new TextEncoder().encode(message);
 
-  // Import user-agent public key
-  const uaPub = await crypto.subtle.importKey(
-    'raw', uaPubBytes,
-    { name: 'ECDH', namedCurve: 'P-256' },
-    false, []
-  );
-
-  // Generate ephemeral server key pair
-  const asKeys = await crypto.subtle.generateKey(
-    { name: 'ECDH', namedCurve: 'P-256' },
-    true, ['deriveBits']
-  );
-
-  // ECDH shared secret
-  const ecdhBits = new Uint8Array(
-    await crypto.subtle.deriveBits({ name: 'ECDH', public: uaPub }, asKeys.privateKey, 256)
-  );
-
-  // Export server public key (uncompressed, 65 bytes)
+  const uaPub = await crypto.subtle.importKey('raw', uaPubBytes, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const asKeys = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const ecdhBits = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaPub }, asKeys.privateKey, 256));
   const asPubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', asKeys.publicKey));
-
-  // Random 16-byte salt
   const salt = crypto.getRandomValues(new Uint8Array(16));
 
-  // RFC 8291 § 3.3 – IKM derivation
-  // PRK_key = HKDF-Extract(salt=auth, IKM=ecdh_secret)
   const prkKey = new Uint8Array(await hmac(authBytes, ecdhBits));
-
-  // IKM = HKDF-Expand(PRK_key, info="WebPush: info\0" + ua_pub + as_pub, L=32)
   const authInfo = concat(enc('WebPush: info\x00'), uaPubBytes, asPubRaw);
   const ikm = (await hmac(prkKey, concat(authInfo, new Uint8Array([1])))).slice(0, 32);
-
-  // RFC 8188 – CEK + NONCE from IKM
-  // PRK = HKDF-Extract(salt=salt, IKM=ikm)
   const prk = new Uint8Array(await hmac(salt, new Uint8Array(ikm)));
-
   const cek   = (await hmac(prk, concat(enc('Content-Encoding: aes128gcm\x00'), new Uint8Array([1])))).slice(0, 16);
   const nonce = (await hmac(prk, concat(enc('Content-Encoding: nonce\x00'),      new Uint8Array([1])))).slice(0, 12);
 
-  // Encrypt: plaintext + 0x02 (last-record delimiter)
   const padded = concat(plaintext, new Uint8Array([2]));
   const aesKey = await crypto.subtle.importKey('raw', cek, { name: 'AES-GCM' }, false, ['encrypt']);
-  const ciphertext = new Uint8Array(
-    await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, padded)
-  );
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, padded));
 
-  // RFC 8188 content-coding header: salt(16) + rs(4, BE) + idlen(1) + keyid(65) + ciphertext
   const rs = new ArrayBuffer(4);
   new DataView(rs).setUint32(0, padded.length + 16, false);
-
   return concat(salt, new Uint8Array(rs), new Uint8Array([65]), asPubRaw, ciphertext);
 }
 
 async function hmac(key, data) {
   const k = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return crypto.subtle.sign('HMAC', k, data);
+}
+
+// ─── Scan endpoints ───────────────────────────────────────────────────────────
+
+async function handleScanPost(request, env) {
+  const scan = await request.json();
+  const key = `scan-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+  await env.SUBS.put(key, JSON.stringify({ ...scan, _key: key }), { expirationTtl: 60 * 60 * 24 * 90 });
+  return new Response(JSON.stringify({ id: key }), { headers: { ...CORS, 'Content-Type': 'application/json' } });
+}
+
+async function handleScansGet(request, env) {
+  const auth = request.headers.get('Authorization') || '';
+  if (auth !== `Bearer ${env.ADMIN_KEY}`) return new Response('Unauthorized', { status: 401, headers: CORS });
+  const { keys } = await env.SUBS.list({ prefix: 'scan-' });
+  const scans = (await Promise.all(keys.map(async ({ name }) => {
+    const v = await env.SUBS.get(name);
+    return v ? JSON.parse(v) : null;
+  }))).filter(Boolean).sort((a, b) => b.time - a.time);
+  return new Response(JSON.stringify(scans), { headers: { ...CORS, 'Content-Type': 'application/json' } });
+}
+
+async function handleScanDelete(key, request, env) {
+  const auth = request.headers.get('Authorization') || '';
+  if (auth !== `Bearer ${env.ADMIN_KEY}`) return new Response('Unauthorized', { status: 401, headers: CORS });
+  await env.SUBS.delete(`scan-${key}`);
+  return new Response('OK', { headers: CORS });
 }
 
 // ─── VAPID JWT ────────────────────────────────────────────────────────────────
