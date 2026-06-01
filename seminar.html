@@ -724,11 +724,12 @@
 
     <div class="scan-actions" id="scan-actions" style="display:none">
       <button class="scan-btn secondary" onclick="resetScan()">✕ Wis</button>
-      <button class="scan-btn primary" id="scan-analyze-btn" onclick="analyzeScan()">✨ Analyseer</button>
+      <button class="scan-btn primary" id="scan-ai-btn" onclick="analyzeScan()">✨ AI (Claude)</button>
+      <button class="scan-btn secondary" id="scan-ocr-btn" onclick="analyzeScanOCR()">📄 OCR gratis</button>
     </div>
 
     <div id="scan-loading" class="scan-loading" style="display:none">
-      <div class="spinner"></div> Claude analyseert het document…
+      <div class="spinner"></div><span id="scan-loading-msg">Analyseren…</span>
     </div>
 
     <div class="scan-result" id="scan-result">
@@ -1268,14 +1269,54 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     document.getElementById('scan-loading').style.display = 'none';
   }
 
+  function setScanBusy(busy) {
+    document.getElementById('scan-loading').style.display = busy ? 'flex' : 'none';
+    document.getElementById('scan-ai-btn').disabled = busy;
+    document.getElementById('scan-ocr-btn').disabled = busy;
+    if (busy) document.getElementById('scan-result').style.display = 'none';
+  }
+
+  function showScanResult(extractedText, structured) {
+    document.getElementById('scan-result-text').textContent = extractedText;
+    const card = document.getElementById('scan-financial-card');
+    if (structured?.is_financial) {
+      document.getElementById('sf-amount').textContent   = structured.debt_amount      || '—';
+      document.getElementById('sf-creditor').textContent = structured.creditor_name    || '—';
+      document.getElementById('sf-address').textContent  = structured.creditor_address || '—';
+      document.getElementById('sf-contact').textContent  = structured.creditor_contact || '—';
+      document.getElementById('sf-due').textContent      = structured.due_date         || '—';
+      document.getElementById('sf-ref').textContent      = structured.reference        || '—';
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+    document.getElementById('scan-result').style.display = 'block';
+
+    const scanEntry = {
+      id: uid(), time: Date.now(),
+      img: `data:${scanImageMime};base64,${scanImageBase64}`,
+      text: extractedText, structured,
+    };
+    saveScanHistory(scanEntry);
+    renderScanHistory();
+
+    const workerUrl = localStorage.getItem('seminar-worker-url');
+    if (workerUrl) {
+      fetch(`${workerUrl}/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...scanEntry, img: `data:${scanImageMime};base64,${scanImageBase64.slice(0, 5000)}` }),
+      }).catch(() => {});
+    }
+  }
+
   async function analyzeScan() {
     const apiKey = localStorage.getItem('seminar-api-key');
     if (!apiKey) { alert('Voer eerst een Anthropic API sleutel in via ⚙️ instellingen.'); return; }
     if (!scanImageBase64) return;
 
-    document.getElementById('scan-loading').style.display = 'flex';
-    document.getElementById('scan-analyze-btn').disabled = true;
-    document.getElementById('scan-result').style.display = 'none';
+    document.getElementById('scan-loading-msg').textContent = 'Claude analyseert het document…';
+    setScanBusy(true);
 
     try {
       const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1318,59 +1359,98 @@ JSON:
       const data = await resp.json();
       const raw = data.content?.[0]?.text?.trim() || '';
 
-      // Parse TEKST and JSON sections
       const textMatch = raw.match(/TEKST:\s*([\s\S]*?)(?=\nJSON:|$)/i);
       const jsonMatch = raw.match(/JSON:\s*(\{[\s\S]*\})/i);
-
       const extractedText = textMatch ? textMatch[1].trim() : raw;
       let structured = null;
-      if (jsonMatch) {
-        try { structured = JSON.parse(jsonMatch[1]); } catch (_) {}
-      }
+      if (jsonMatch) { try { structured = JSON.parse(jsonMatch[1]); } catch (_) {} }
 
-      // Show text result
-      document.getElementById('scan-result-text').textContent = extractedText;
-
-      // Show financial card if applicable
-      const card = document.getElementById('scan-financial-card');
-      if (structured?.is_financial) {
-        document.getElementById('sf-amount').textContent   = structured.debt_amount   || '—';
-        document.getElementById('sf-creditor').textContent = structured.creditor_name  || '—';
-        document.getElementById('sf-address').textContent  = structured.creditor_address || '—';
-        document.getElementById('sf-contact').textContent  = structured.creditor_contact || '—';
-        document.getElementById('sf-due').textContent      = structured.due_date       || '—';
-        document.getElementById('sf-ref').textContent      = structured.reference      || '—';
-        card.style.display = 'block';
-      } else {
-        card.style.display = 'none';
-      }
-
-      document.getElementById('scan-result').style.display = 'block';
-
-      // Save locally
-      const scanEntry = {
-        id: uid(), time: Date.now(),
-        img: `data:${scanImageMime};base64,${scanImageBase64}`,
-        text: extractedText, structured,
-      };
-      saveScanHistory(scanEntry);
-      renderScanHistory();
-
-      // Send to worker if URL is set
-      const workerUrl = localStorage.getItem('seminar-worker-url');
-      if (workerUrl) {
-        fetch(`${workerUrl}/scan`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...scanEntry, img: `data:${scanImageMime};base64,${scanImageBase64.slice(0,5000)}` }),
-        }).catch(() => {});
-      }
+      showScanResult(extractedText, structured);
     } catch (err) {
       alert('Fout bij analyseren: ' + err.message);
     } finally {
-      document.getElementById('scan-loading').style.display = 'none';
-      document.getElementById('scan-analyze-btn').disabled = false;
+      setScanBusy(false);
     }
+  }
+
+  async function analyzeScanOCR() {
+    if (!scanImageBase64) return;
+    document.getElementById('scan-loading-msg').textContent = 'OCR herkent tekst… (eerste keer ±15 sec)';
+    setScanBusy(true);
+
+    try {
+      // Lazy-load Tesseract.js
+      if (!window.Tesseract) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'https://unpkg.com/tesseract.js@4/dist/tesseract.min.js';
+          s.onload = resolve; s.onerror = reject;
+          document.head.appendChild(s);
+        });
+      }
+
+      const imageDataUrl = `data:${scanImageMime};base64,${scanImageBase64}`;
+      const { data: { text } } = await Tesseract.recognize(imageDataUrl, 'nld+eng', {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            document.getElementById('scan-loading-msg').textContent =
+              `OCR bezig… ${Math.round(m.progress * 100)}%`;
+          }
+        },
+      });
+
+      const structured = extractFinancialFromText(text);
+      showScanResult(text.trim(), structured);
+    } catch (err) {
+      alert('Fout bij OCR: ' + err.message);
+    } finally {
+      setScanBusy(false);
+    }
+  }
+
+  function extractFinancialFromText(text) {
+    const s = { is_financial: false, summary: null };
+
+    // Bedrag: zoek naar € of EUR patronen
+    const amountMatches = [...text.matchAll(/€\s*([\d.,]+)/g)];
+    const eurMatches    = [...text.matchAll(/([\d.,]+)\s*euro/gi)];
+    if (amountMatches.length > 0) {
+      // Kies het grootste bedrag
+      const amounts = amountMatches.map(m => ({ raw: '€ ' + m[1], val: parseFloat(m[1].replace(/\./g,'').replace(',','.')) }));
+      amounts.sort((a, b) => b.val - a.val);
+      s.debt_amount = amounts[0].raw;
+      s.is_financial = true;
+    } else if (eurMatches.length > 0) {
+      s.debt_amount = eurMatches[0][1] + ' euro';
+      s.is_financial = true;
+    }
+
+    // Referentienummer
+    const refMatch = text.match(/(?:kenmerk|referentie|factuurnummer|betalingskenmerk|ons kenmerk|ref\.?)[:\s]+([A-Z0-9\-\/\.]{4,30})/i);
+    if (refMatch) s.reference = refMatch[1].trim();
+
+    // Vervaldatum
+    const dueMatch = text.match(/(?:vervaldatum|uiterlijk|betalen voor|vóór|voor)[:\s]+(\d{1,2}[-\s\/]\d{1,2}[-\s\/]\d{2,4}|\d{1,2}\s+\w+\s+\d{4})/i);
+    if (dueMatch) s.due_date = dueMatch[1].trim();
+
+    // Schuldeiser: eerste niet-lege regel die er als bedrijfsnaam uitziet
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2 && l.length < 60 && !/^\d/.test(l));
+    if (lines.length > 0) s.creditor_name = lines[0];
+
+    // Adres: zoek postcode-patroon
+    const addrMatch = text.match(/([A-Za-z '\-]+)\n?\s*(\d{4}\s?[A-Z]{2})\s+([A-Za-z\s]+)/);
+    if (addrMatch) s.creditor_address = `${addrMatch[1].trim()}, ${addrMatch[2]} ${addrMatch[3].trim()}`;
+
+    // Email en telefoon
+    const emailMatch = text.match(/[\w.+-]+@[\w-]+\.\w+/);
+    if (emailMatch) s.creditor_contact = emailMatch[0];
+    const telMatch = text.match(/(?:tel\.?|telefoon)[:\s]*([\d\s\-\+\(\)]{8,})/i);
+    if (telMatch && !s.creditor_contact) s.creditor_contact = telMatch[1].trim();
+
+    if (s.is_financial) {
+      s.summary = `Schulddocument${s.creditor_name ? ' van ' + s.creditor_name : ''}${s.debt_amount ? ' · ' + s.debt_amount : ''}`;
+    }
+    return s;
   }
 
   function renderScanBlockSelect() {
