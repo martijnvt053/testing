@@ -622,13 +622,6 @@
       <input type="url" id="worker-url-input" placeholder="https://seminar-push.jouw-naam.workers.dev" autocomplete="off" />
       <p class="settings-hint">Nodig voor push notificaties en document scans.</p>
     </div>
-    <div class="settings-group">
-      <label>Azure Vision Endpoint URL</label>
-      <input type="url" id="azure-endpoint-input" placeholder="https://seminar-vision.cognitiveservices.azure.com/" autocomplete="off" />
-      <label style="margin-top:8px;">Azure Vision Sleutel</label>
-      <input type="password" id="azure-key-input" placeholder="Jouw Azure API sleutel" autocomplete="off" />
-      <p class="settings-hint">Via Azure Portal → jouw Computer Vision resource → Keys and Endpoint.</p>
-    </div>
     <button class="settings-save" onclick="saveSettings()">Opslaan</button>
     <div id="push-section" style="margin-top:14px; display:none;">
       <button class="settings-save" style="background:var(--success);" onclick="subscribePush()">🔔 Push notificaties inschakelen</button>
@@ -957,9 +950,6 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     const key = localStorage.getItem('seminar-api-key') || '';
     document.getElementById('api-key-input').value = key ? '••••••••' + key.slice(-4) : '';
     document.getElementById('worker-url-input').value = localStorage.getItem('seminar-worker-url') || '';
-    const azKey = localStorage.getItem('seminar-azure-key') || '';
-    document.getElementById('azure-key-input').value = azKey ? '••••••••' + azKey.slice(-4) : '';
-    document.getElementById('azure-endpoint-input').value = localStorage.getItem('seminar-azure-endpoint') || '';
     document.getElementById('settings-ok').style.display = 'none';
     document.getElementById('push-status').textContent = '';
     updatePushSection();
@@ -975,11 +965,6 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     const workerUrl = document.getElementById('worker-url-input').value.trim().replace(/\/$/, '');
     if (workerUrl) { localStorage.setItem('seminar-worker-url', workerUrl); sendWorkerUrlToSW(workerUrl); }
 
-    const azureEndpoint = document.getElementById('azure-endpoint-input').value.trim().replace(/\/$/, '');
-    if (azureEndpoint) localStorage.setItem('seminar-azure-endpoint', azureEndpoint);
-
-    const azureKey = document.getElementById('azure-key-input').value.trim();
-    if (azureKey && !azureKey.startsWith('••••')) localStorage.setItem('seminar-azure-key', azureKey);
 
     updatePushSection();
     const ok = document.getElementById('settings-ok');
@@ -1143,10 +1128,9 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
   }
 
   async function analyzeScanAzure() {
-    const endpoint = localStorage.getItem('seminar-azure-endpoint');
-    const key = localStorage.getItem('seminar-azure-key');
-    if (!endpoint || !key) {
-      alert('Voer eerst de Azure Endpoint URL en sleutel in via ⚙️ instellingen.');
+    const workerUrl = localStorage.getItem('seminar-worker-url');
+    if (!workerUrl) {
+      alert('Voer eerst de Cloudflare Worker URL in via ⚙️ instellingen.\n\nZet ook AZURE_ENDPOINT en AZURE_KEY als variabelen in je Cloudflare Worker.');
       openSettings();
       return;
     }
@@ -1160,18 +1144,13 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
 
       document.getElementById('scan-loading-msg').textContent = 'Azure Vision analyseert…';
 
-      // Decode base64 to binary
       const binary = atob(compressed);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
-      const url = `${endpoint}/vision/v3.2/ocr?language=nl&detectOrientation=true`;
-      const resp = await fetch(url, {
+      const resp = await fetch(`${workerUrl}/azure-ocr`, {
         method: 'POST',
-        headers: {
-          'Ocp-Apim-Subscription-Key': key,
-          'Content-Type': 'application/octet-stream',
-        },
+        headers: { 'Content-Type': 'application/octet-stream' },
         body: bytes.buffer,
       });
 

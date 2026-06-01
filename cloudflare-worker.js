@@ -5,9 +5,11 @@
  * 1. Ga naar https://dash.cloudflare.com → Workers & Pages → Create Worker
  * 2. Plak deze code, klik Deploy
  * 3. Ga naar de worker → Settings → Variables:
- *    - ADMIN_KEY  = zelf te kiezen wachtwoord (bijv. "seminar2024")
- *    - VAPID_PUB  = BDuanFLTbpWrUdysn2CYIfiy0pqk2NU1BCOmwLJ0xVjHCmMTi45JQDxeAguFIdcwcEqqELyuozmg1w1WdVSx8j0
- *    - VAPID_PRIV = pavZg9M7A617XKposwc2b8U7TAwEqzT0TDnV9gg8gvk
+ *    - ADMIN_KEY      = zelf te kiezen wachtwoord (bijv. "seminar2024")
+ *    - VAPID_PUB      = BDuanFLTbpWrUdysn2CYIfiy0pqk2NU1BCOmwLJ0xVjHCmMTi45JQDxeAguFIdcwcEqqELyuozmg1w1WdVSx8j0
+ *    - VAPID_PRIV     = pavZg9M7A617XKposwc2b8U7TAwEqzT0TDnV9gg8gvk
+ *    - AZURE_ENDPOINT = https://jouw-resource.cognitiveservices.azure.com  (optioneel)
+ *    - AZURE_KEY      = jouw Azure Computer Vision sleutel                 (optioneel)
  * 4. Ga naar Workers → KV → Create namespace:
  *    - naam: SUBS → bind aan worker als "SUBS"
  *    - naam: MSG  → bind aan worker als "MSG"
@@ -45,6 +47,9 @@ export default {
     }
     if (pathname.startsWith('/scan/') && request.method === 'DELETE') {
       return handleScanDelete(pathname.slice(6), request, env);
+    }
+    if (pathname === '/azure-ocr' && request.method === 'POST') {
+      return handleAzureOcr(request, env);
     }
 
     return new Response('Not Found', { status: 404, headers: CORS });
@@ -232,6 +237,34 @@ async function handleScanDelete(key, request, env) {
   }
   await env.SUBS.delete(`scan-${key}`);
   return new Response('OK', { headers: CORS });
+}
+
+// ─── Azure OCR proxy ─────────────────────────────────────────────────────────
+
+async function handleAzureOcr(request, env) {
+  if (!env.AZURE_ENDPOINT || !env.AZURE_KEY) {
+    return new Response(JSON.stringify({ error: 'Azure niet geconfigureerd. Voeg AZURE_ENDPOINT en AZURE_KEY toe als variabelen in de Cloudflare Worker.' }), {
+      status: 503, headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const imageBytes = await request.arrayBuffer();
+  const endpoint = env.AZURE_ENDPOINT.replace(/\/$/, '');
+
+  const azureResp = await fetch(`${endpoint}/vision/v3.2/ocr?language=nl&detectOrientation=true`, {
+    method: 'POST',
+    headers: {
+      'Ocp-Apim-Subscription-Key': env.AZURE_KEY,
+      'Content-Type': 'application/octet-stream',
+    },
+    body: imageBytes,
+  });
+
+  const data = await azureResp.json();
+  return new Response(JSON.stringify(data), {
+    status: azureResp.status,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  });
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
