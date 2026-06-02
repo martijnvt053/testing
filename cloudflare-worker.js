@@ -51,6 +51,9 @@ export default {
     if (pathname === '/azure-ocr' && request.method === 'POST') {
       return handleAzureOcr(request, env);
     }
+    if (pathname === '/azure-read' && request.method === 'POST') {
+      return handleAzureRead(request, env);
+    }
 
     return new Response('Not Found', { status: 404, headers: CORS });
   },
@@ -264,6 +267,61 @@ async function handleAzureOcr(request, env) {
   return new Response(JSON.stringify(data), {
     status: azureResp.status,
     headers: { ...CORS, 'Content-Type': 'application/json' },
+  });
+}
+
+// ─── Azure Read API (handschrift + gedrukt) ───────────────────────────────────
+
+async function handleAzureRead(request, env) {
+  if (!env.AZURE_ENDPOINT || !env.AZURE_KEY) {
+    return new Response(JSON.stringify({ error: 'Azure niet geconfigureerd. Voeg AZURE_ENDPOINT en AZURE_KEY toe als variabelen in de Cloudflare Worker.' }), {
+      status: 503, headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const imageBytes = await request.arrayBuffer();
+  const endpoint = env.AZURE_ENDPOINT.replace(/\/$/, '');
+
+  const startResp = await fetch(`${endpoint}/vision/v3.2/read/analyze`, {
+    method: 'POST',
+    headers: {
+      'Ocp-Apim-Subscription-Key': env.AZURE_KEY,
+      'Content-Type': 'application/octet-stream',
+    },
+    body: imageBytes,
+  });
+
+  if (!startResp.ok) {
+    const errData = await startResp.json().catch(() => ({}));
+    return new Response(JSON.stringify(errData), {
+      status: startResp.status,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const operationUrl = startResp.headers.get('Operation-Location');
+  if (!operationUrl) {
+    return new Response(JSON.stringify({ error: 'Geen Operation-Location header ontvangen van Azure' }), {
+      status: 502, headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Poll for result — max 15 × 1.5s = 22.5s
+  for (let i = 0; i < 15; i++) {
+    await new Promise(r => setTimeout(r, 1500));
+    const pollResp = await fetch(operationUrl, {
+      headers: { 'Ocp-Apim-Subscription-Key': env.AZURE_KEY },
+    });
+    const data = await pollResp.json();
+    if (data.status === 'succeeded' || data.status === 'failed') {
+      return new Response(JSON.stringify(data), {
+        headers: { ...CORS, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
+  return new Response(JSON.stringify({ error: 'Azure Read API time-out na 22 seconden' }), {
+    status: 504, headers: { ...CORS, 'Content-Type': 'application/json' },
   });
 }
 
