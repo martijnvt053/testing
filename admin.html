@@ -4,246 +4,334 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#5B4FBE">
-  <title>Beheerportaal</title>
+  <title>Beheerportaal — Seminar</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --purple: #5B4FBE;
+      --purple-dark: #4a3fa8;
       --purple-light: #ede9fe;
       --bg: #f4f4f8;
       --card: #ffffff;
-      --border: #e8e8f0;
+      --border: #e4e4ee;
       --text: #1a1a2e;
       --muted: #7c7c99;
       --danger: #e53e3e;
       --success: #38a169;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--bg);
-      min-height: 100vh;
-      padding-bottom: 32px;
+      --sidebar: #2d2a5e;
     }
 
-    /* Header */
-    .app-header {
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      color: var(--text);
+    }
+
+    /* ── Top navbar ──────────────────────────────────────────────────────── */
+    .navbar {
       background: var(--purple);
       color: white;
-      padding: 20px 20px 18px;
+      padding: 0 32px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .navbar-brand { display: flex; align-items: center; gap: 12px; }
+    .navbar-brand .logo {
+      width: 36px; height: 36px; background: rgba(255,255,255,0.2);
+      border-radius: 8px; display: flex; align-items: center;
+      justify-content: center; font-size: 18px;
+    }
+    .navbar-brand h1 { font-size: 17px; font-weight: 700; }
+    .navbar-brand .sub { font-size: 12px; opacity: 0.7; }
+    .navbar-right { display: flex; align-items: center; gap: 12px; }
+    .nav-settings-btn {
+      background: rgba(255,255,255,0.15);
+      border: none; color: white; border-radius: 8px;
+      padding: 7px 14px; font-size: 13px; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; gap: 6px;
+    }
+    .nav-settings-btn:hover { background: rgba(255,255,255,0.25); }
+
+    /* ── Main layout ─────────────────────────────────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 24px;
+      padding: 24px 32px;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      align-items: start;
+    }
+
+    /* ── Cards ───────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .card-header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
-    .app-header h1 { font-size: 20px; font-weight: 700; }
-    .app-header .sub { font-size: 12px; opacity: 0.75; margin-top: 2px; }
-    .header-badge {
-      background: rgba(255,255,255,0.25);
-      border-radius: 50px;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 700;
-    }
+    .card-title { font-size: 15px; font-weight: 700; color: var(--text); }
+    .card-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .card-body { padding: 20px; }
 
-    /* Sections */
-    .section { padding: 16px 16px 0; }
-    .section-title {
-      font-size: 13px; font-weight: 700; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 0.6px;
-      margin-bottom: 10px;
+    /* ── Form ────────────────────────────────────────────────────────────── */
+    label {
+      display: block; font-size: 12px; font-weight: 600;
+      color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.4px; margin-bottom: 6px;
     }
-
-    /* Card */
-    .card {
-      background: var(--card);
-      border-radius: 14px;
-      overflow: hidden;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
-      margin-bottom: 16px;
-    }
-
-    /* Form fields */
-    .field-group { padding: 4px 0; }
-    .field-row {
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
-    }
-    .field-row:last-child { border-bottom: none; }
-    .field-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-    .field-label strong { color: var(--text); font-size: 14px; font-weight: 600; }
     textarea, input[type="url"], input[type="password"] {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      font-size: 14px;
-      font-family: inherit;
-      outline: none;
-      color: var(--text);
-      background: white;
-      margin-top: 6px;
+      width: 100%; padding: 10px 12px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 14px; font-family: inherit;
+      outline: none; color: var(--text); background: white;
+      transition: border-color 0.15s;
     }
     textarea:focus, input:focus { border-color: var(--purple); }
-    textarea { resize: vertical; min-height: 80px; }
+    textarea { resize: vertical; min-height: 100px; margin-bottom: 14px; }
+    input { margin-bottom: 14px; }
 
-    /* Buttons */
     .btn {
-      width: 100%;
-      padding: 14px;
+      padding: 10px 20px;
       background: var(--purple);
-      color: white;
-      border: none;
-      border-radius: 12px;
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: opacity 0.15s;
+      color: white; border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: background 0.15s;
     }
-    .btn:active { opacity: 0.8; }
+    .btn:hover { background: var(--purple-dark); }
     .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .btn-secondary {
+    .btn-full { width: 100%; padding: 12px; font-size: 15px; }
+    .btn-save { background: var(--success); }
+    .btn-save:hover { background: #2f8a59; }
+    .btn-outline {
       background: none; border: 1.5px solid var(--purple);
-      color: var(--purple); border-radius: 10px;
-      padding: 8px 16px; font-size: 13px; font-weight: 600;
+      color: var(--purple); border-radius: 8px;
+      padding: 6px 14px; font-size: 13px; font-weight: 600;
       cursor: pointer;
     }
-    .btn-secondary:active { opacity: 0.7; }
-    .btn-save { background: var(--success); }
+    .btn-outline:hover { background: var(--purple-light); }
 
     .result {
-      margin-top: 10px; padding: 10px 14px; border-radius: 10px;
+      margin-top: 10px; padding: 10px 14px; border-radius: 8px;
       font-size: 13px; display: none;
     }
     .result.ok { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
     .result.err { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
 
-    /* Scans list header */
-    .scans-header {
-      display: flex; align-items: center;
-      justify-content: space-between; margin-bottom: 10px;
+    /* ── Settings panel ──────────────────────────────────────────────────── */
+    .settings-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    .settings-overlay.open { display: flex; }
+    .settings-panel {
+      background: white; border-radius: 16px;
+      padding: 28px; width: 420px;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.2);
+    }
+    .settings-panel h2 { font-size: 17px; font-weight: 700; margin-bottom: 18px; }
+    .settings-hint { font-size: 11px; color: var(--muted); margin-top: -10px; margin-bottom: 14px; }
+    .settings-footer { display: flex; gap: 10px; margin-top: 6px; }
+    .btn-cancel {
+      background: none; border: 1.5px solid var(--border);
+      color: var(--muted); border-radius: 8px;
+      padding: 10px 20px; font-size: 14px; font-weight: 600;
+      cursor: pointer; flex: 1;
+    }
+    .btn-cancel:hover { background: var(--bg); }
+
+    /* ── Scans ───────────────────────────────────────────────────────────── */
+    .scans-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 16px;
     }
 
-    /* Scan card */
     .scan-card {
       background: var(--card);
-      border-radius: 14px;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
       overflow: hidden;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
-      margin-bottom: 12px;
-      border-left: 4px solid transparent;
+      border-left: 4px solid var(--border);
     }
     .scan-card.financial { border-left-color: var(--purple); }
+
     .scan-card-header {
-      display: flex; gap: 12px; align-items: center;
-      padding: 14px 14px 10px;
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
       border-bottom: 1px solid var(--border);
     }
     .scan-avatar {
-      width: 44px; height: 44px; border-radius: 50%;
+      width: 40px; height: 40px; border-radius: 50%;
       background: var(--purple-light); color: var(--purple);
       display: flex; align-items: center; justify-content: center;
-      font-size: 18px; flex-shrink: 0;
+      font-size: 16px; flex-shrink: 0;
     }
+    .scan-card.financial .scan-avatar { background: var(--purple); color: white; }
     .scan-meta { flex: 1; min-width: 0; }
-    .scan-time { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
-    .scan-summary { font-size: 14px; font-weight: 600; color: var(--text); }
+    .scan-time { font-size: 11px; color: var(--muted); }
+    .scan-summary { font-size: 14px; font-weight: 600; color: var(--text); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .scan-del-btn {
-      background: none; border: none; color: #ccc; font-size: 18px;
-      cursor: pointer; padding: 4px; flex-shrink: 0;
+      background: none; border: none; color: #ccc;
+      font-size: 16px; cursor: pointer; padding: 4px 6px;
+      border-radius: 6px;
     }
-    .scan-del-btn:active { color: var(--danger); }
+    .scan-del-btn:hover { color: var(--danger); background: #fff5f5; }
 
-    /* Achterstand box */
-    .achterstand-box { padding: 12px 14px; }
+    /* Achterstand block */
+    .achterstand-box { padding: 14px 16px; }
     .achterstand-title {
-      font-size: 12px; font-weight: 700; color: var(--purple);
-      text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px;
+      font-size: 10px; font-weight: 700; color: var(--purple);
+      text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 6px;
     }
-    .ach-amount {
-      font-size: 22px; font-weight: 800; color: var(--danger); margin-bottom: 12px;
+    .ach-amount { font-size: 24px; font-weight: 800; color: var(--danger); margin-bottom: 12px; }
+    .ach-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px;
     }
-    .ach-fields { display: flex; flex-direction: column; gap: 8px; }
-    .ach-field { }
-    .ach-key { font-size: 11px; color: var(--muted); margin-bottom: 1px; }
-    .ach-val { font-size: 13px; color: var(--text); font-weight: 500; }
+    .ach-field {}
+    .ach-key { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+    .ach-val { font-size: 13px; color: var(--text); font-weight: 500; word-break: break-all; }
     .ach-val.mono { font-family: 'Courier New', monospace; font-size: 12px; }
+    .ach-full { grid-column: 1 / -1; }
 
     .scan-text-preview {
-      padding: 10px 14px;
-      font-size: 12px; color: var(--muted); line-height: 1.5;
+      padding: 10px 16px;
+      font-size: 12px; color: var(--muted); line-height: 1.6;
       overflow: hidden; display: -webkit-box;
       -webkit-line-clamp: 2; -webkit-box-orient: vertical;
       border-top: 1px solid var(--border);
     }
 
     .scans-empty {
-      text-align: center; padding: 36px 20px;
+      grid-column: 1 / -1;
+      text-align: center; padding: 48px 20px;
       color: var(--muted); font-size: 14px;
     }
-    .scans-empty .empty-icon { font-size: 36px; margin-bottom: 10px; }
+    .scans-empty .icon { font-size: 40px; margin-bottom: 12px; }
 
-    /* Config toggle */
-    .config-toggle {
-      background: none; border: none; color: var(--purple);
-      font-size: 13px; cursor: pointer; font-weight: 600;
-      padding: 0; margin-bottom: 12px;
-      display: flex; align-items: center; gap: 4px;
+    /* ── Stats row ───────────────────────────────────────────────────────── */
+    .stats-row {
+      display: flex; gap: 16px; margin-bottom: 20px;
     }
-    .config-section { display: none; }
-    .config-section.open { display: block; }
-    .config-hint { font-size: 11px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
+    .stat-card {
+      background: var(--card); border-radius: 12px;
+      padding: 16px 20px; flex: 1;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      display: flex; align-items: center; gap: 14px;
+    }
+    .stat-icon {
+      width: 42px; height: 42px; border-radius: 10px;
+      background: var(--purple-light); color: var(--purple);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .stat-num { font-size: 22px; font-weight: 800; color: var(--text); }
+    .stat-label { font-size: 12px; color: var(--muted); margin-top: 1px; }
   </style>
 </head>
 <body>
 
-<div class="app-header">
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <div class="logo">📓</div>
+    <div>
+      <h1>Beheerportaal</h1>
+      <div class="sub">Ben Tichelaar MBA — Seminar</div>
+    </div>
+  </div>
+  <div class="navbar-right">
+    <button class="nav-settings-btn" onclick="openSettings()">⚙️ Instellingen</button>
+  </div>
+</nav>
+
+<!-- Settings overlay -->
+<div class="settings-overlay" id="settings-overlay" onclick="closeSettingsOutside(event)">
+  <div class="settings-panel">
+    <h2>⚙️ Verbindingsinstellingen</h2>
+    <label>Cloudflare Worker URL</label>
+    <input type="url" id="worker-url" placeholder="https://seminar-push.naam.workers.dev" />
+    <label>Admin sleutel</label>
+    <input type="password" id="admin-key" placeholder="Je ADMIN_KEY uit Cloudflare" />
+    <p class="settings-hint">Worden alleen lokaal opgeslagen in je browser.</p>
+    <div class="settings-footer">
+      <button class="btn-cancel" onclick="closeSettings()">Annuleren</button>
+      <button class="btn btn-save" style="flex:1" onclick="saveConfig()">Opslaan</button>
+    </div>
+    <div class="result" id="config-result"></div>
+  </div>
+</div>
+
+<!-- Main layout -->
+<div class="layout">
+
+  <!-- Left column: Send notification -->
   <div>
-    <h1>Beheerportaal</h1>
-    <div class="sub">Seminar — Ben Tichelaar MBA</div>
-  </div>
-  <div class="header-badge">Admin</div>
-</div>
-
-<div class="section">
-  <div class="section-title">Push notificatie</div>
-  <div class="card">
-    <div class="field-row">
-      <div class="field-label">Bericht aan deelnemers</div>
-      <textarea id="message" placeholder="Typ hier je bericht…"></textarea>
-    </div>
-    <div class="field-row">
-      <button class="btn" id="send-btn" onclick="sendNotification()">Verstuur push notificatie</button>
-      <div class="result" id="send-result"></div>
-    </div>
-  </div>
-</div>
-
-<div class="section">
-  <div class="scans-header">
-    <div class="section-title" style="margin-bottom:0">Gescande documenten</div>
-    <button class="btn-secondary" onclick="loadScans()">↻ Vernieuwen</button>
-  </div>
-  <div id="scans-list"></div>
-</div>
-
-<div class="section">
-  <button class="config-toggle" onclick="toggleConfig()">⚙️ Instellingen</button>
-  <div class="config-section" id="config-section">
     <div class="card">
-      <div class="field-row">
-        <div class="field-label">Cloudflare Worker URL</div>
-        <input type="url" id="worker-url" placeholder="https://seminar-push.naam.workers.dev" />
+      <div class="card-header">
+        <div>
+          <div class="card-title">📣 Push notificatie</div>
+          <div class="card-sub">Stuur een bericht naar alle deelnemers</div>
+        </div>
       </div>
-      <div class="field-row">
-        <div class="field-label">Admin sleutel</div>
-        <input type="password" id="admin-key" placeholder="Je ADMIN_KEY uit Cloudflare" />
-        <p class="config-hint" style="margin-top:6px;">Worden alleen lokaal opgeslagen in je browser.</p>
-      </div>
-      <div class="field-row">
-        <button class="btn btn-save" onclick="saveConfig()">Opslaan</button>
-        <div class="result" id="config-result"></div>
+      <div class="card-body">
+        <label>Bericht</label>
+        <textarea id="message" placeholder="Typ hier je bericht voor de deelnemers…"></textarea>
+        <button class="btn btn-full" id="send-btn" onclick="sendNotification()">Verstuur push notificatie</button>
+        <div class="result" id="send-result"></div>
       </div>
     </div>
   </div>
+
+  <!-- Right column: Scans -->
+  <div>
+    <!-- Stats -->
+    <div class="stats-row" id="stats-row" style="display:none">
+      <div class="stat-card">
+        <div class="stat-icon">📄</div>
+        <div>
+          <div class="stat-num" id="stat-total">0</div>
+          <div class="stat-label">Gescande documenten</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⚠️</div>
+        <div>
+          <div class="stat-num" id="stat-financial">0</div>
+          <div class="stat-label">Met achterstand</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scans header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">Gescande documenten</div>
+      <button class="btn-outline" onclick="loadScans()">↻ Vernieuwen</button>
+    </div>
+
+    <div class="scans-grid" id="scans-list"></div>
+  </div>
+
 </div>
 
 <script>
@@ -253,14 +341,18 @@
     loadScans();
   }
 
+  function openSettings() { document.getElementById('settings-overlay').classList.add('open'); }
+  function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); }
+  function closeSettingsOutside(e) { if (e.target === document.getElementById('settings-overlay')) closeSettings(); }
+
   async function sendNotification() {
     const message = document.getElementById('message').value.trim();
     const workerUrl = localStorage.getItem('admin-worker-url');
     const adminKey = localStorage.getItem('admin-key');
     if (!message) { showResult('send-result', 'Vul een bericht in.', false); return; }
     if (!workerUrl || !adminKey) {
-      showResult('send-result', 'Open eerst de instellingen en vul de Worker URL en admin sleutel in.', false);
-      document.getElementById('config-section').classList.add('open');
+      showResult('send-result', 'Vul eerst de Worker URL en admin sleutel in via ⚙️ Instellingen.', false);
+      openSettings();
       return;
     }
     const btn = document.getElementById('send-btn');
@@ -289,57 +381,68 @@
     const adminKey = localStorage.getItem('admin-key');
     const el = document.getElementById('scans-list');
     if (!workerUrl || !adminKey) {
-      el.innerHTML = '<p class="scans-empty"><div class="empty-icon">⚙️</div>Stel eerst de Worker URL en admin sleutel in via instellingen hieronder.</p>';
+      el.innerHTML = '<div class="scans-empty"><div class="icon">⚙️</div>Stel eerst de Worker URL en admin sleutel in via ⚙️ Instellingen rechtsboven.</div>';
       return;
     }
-    el.innerHTML = '<p class="scans-empty">Laden…</p>';
+    el.innerHTML = '<div class="scans-empty">Laden…</div>';
     try {
       const resp = await fetch(`${workerUrl}/scans`, { headers: { 'Authorization': `Bearer ${adminKey}` } });
       if (!resp.ok) throw new Error(resp.status);
       renderScans(await resp.json());
     } catch (e) {
-      el.innerHTML = `<p class="scans-empty">Kon scans niet laden: ${e.message}</p>`;
+      el.innerHTML = `<div class="scans-empty"><div class="icon">⚠️</div>Kon scans niet laden: ${e.message}</div>`;
     }
   }
 
   function renderScans(scans) {
     const el = document.getElementById('scans-list');
+    const financial = scans.filter(s => s.structured?.is_financial);
+
+    document.getElementById('stat-total').textContent = scans.length;
+    document.getElementById('stat-financial').textContent = financial.length;
+    document.getElementById('stats-row').style.display = scans.length ? 'flex' : 'none';
+
     if (!scans.length) {
-      el.innerHTML = '<p class="scans-empty"><div class="empty-icon">📄</div>Nog geen gescande documenten.</p>';
+      el.innerHTML = '<div class="scans-empty"><div class="icon">📄</div>Nog geen gescande documenten.</div>';
       return;
     }
+
     el.innerHTML = scans.map(s => {
       const st = s.structured || {};
       const isFinancial = st.is_financial && (st.debt_amount || st.creditor_name);
       const fields = [
-        { key: 'Schuldeiser',   val: st.creditor_name    },
-        { key: 'Adres',         val: st.creditor_address },
-        { key: 'Telefoon',      val: st.creditor_phone   },
-        { key: 'E-mail',        val: st.creditor_contact },
-        { key: 'Vervaldatum',   val: st.due_date         },
-        { key: 'Referentie',    val: st.reference        },
-        { key: 'Rekening/IBAN', val: st.iban, mono: true },
+        { key: 'Schuldeiser',   val: st.creditor_name,    full: false },
+        { key: 'Adres',         val: st.creditor_address, full: true  },
+        { key: 'Telefoon',      val: st.creditor_phone,   full: false },
+        { key: 'E-mail',        val: st.creditor_contact, full: false },
+        { key: 'Vervaldatum',   val: st.due_date,         full: false },
+        { key: 'Referentie',    val: st.reference,        full: false },
+        { key: 'Rekening/IBAN', val: st.iban,             full: true, mono: true },
       ].filter(f => f.val);
+
       const achterstandHtml = isFinancial ? `
         <div class="achterstand-box">
           <div class="achterstand-title">Achterstand</div>
           ${st.debt_amount ? `<div class="ach-amount">${esc(st.debt_amount)}</div>` : ''}
-          <div class="ach-fields">
+          <div class="ach-grid">
             ${fields.map(f => `
-              <div class="ach-field">
+              <div class="ach-field${f.full ? ' ach-full' : ''}">
                 <div class="ach-key">${f.key}</div>
                 <div class="ach-val${f.mono ? ' mono' : ''}">${esc(f.val)}</div>
               </div>`).join('')}
           </div>
         </div>` : '';
+
       const scanKey = (s._key || s.id || '').replace('scan-', '');
       const summary = st.summary || s.text?.slice(0, 60) || 'Document';
+      const avatar = isFinancial ? '⚠️' : '📄';
+
       return `
         <div class="scan-card ${isFinancial ? 'financial' : ''}">
           <div class="scan-card-header">
-            <div class="scan-avatar">📄</div>
+            <div class="scan-avatar">${avatar}</div>
             <div class="scan-meta">
-              <div class="scan-time">${new Date(s.time).toLocaleString('nl-NL', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+              <div class="scan-time">${new Date(s.time).toLocaleString('nl-NL', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
               <div class="scan-summary">${esc(summary)}</div>
             </div>
             <button class="scan-del-btn" onclick="deleteScan('${scanKey}', this)" title="Verwijderen">✕</button>
@@ -353,6 +456,7 @@
   async function deleteScan(key, btn) {
     const workerUrl = localStorage.getItem('admin-worker-url');
     const adminKey = localStorage.getItem('admin-key');
+    if (!confirm('Dit document verwijderen?')) return;
     btn.closest('.scan-card').style.opacity = '0.4';
     await fetch(`${workerUrl}/scan/${key}`, {
       method: 'DELETE',
@@ -368,13 +472,9 @@
   function saveConfig() {
     localStorage.setItem('admin-worker-url', document.getElementById('worker-url').value.trim().replace(/\/$/, ''));
     localStorage.setItem('admin-key', document.getElementById('admin-key').value.trim());
-    showResult('config-result', '✓ Instellingen opgeslagen', true);
-    setTimeout(toggleConfig, 1500);
+    showResult('config-result', '✓ Opgeslagen', true);
+    setTimeout(closeSettings, 1200);
     loadScans();
-  }
-
-  function toggleConfig() {
-    document.getElementById('config-section').classList.toggle('open');
   }
 
   function showResult(id, msg, ok) {
