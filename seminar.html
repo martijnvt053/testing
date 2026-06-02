@@ -1541,8 +1541,8 @@ JSON:
       // Formeel: € 1.234,56 of 1234 EUR
       ...[...text.matchAll(/€\s*([\d.]+(?:,\d{1,2})?)/g)].map(m => ({ display: '€ ' + m[1], val: parseFloat(m[1].replace(/\./g, '').replace(',', '.')) })),
       ...[...text.matchAll(/\b([\d.]+(?:,\d{1,2})?)\s*(?:euro|EUR)\b/gi)].map(m => ({ display: '€ ' + m[1], val: parseFloat(m[1].replace(/\./g, '').replace(',', '.')) })),
-      // Informeel: 1000,- of 1.000,- (Nederlandse notatie voor geen centen)
-      ...[...text.matchAll(/\b(\d[\d.]*),\s*[-–]/g)].map(m => ({ display: '€ ' + m[1], val: parseInt(m[1].replace(/\./g, '')) })),
+      // Informeel: 1000,- of 1.000,- (Nederlandse notatie, ook met punt of em-dash)
+      ...[...text.matchAll(/\b(\d[\d.]*)[,.]?\s*[-–—]\s*(?=\D|$)/gm)].map(m => ({ display: '€ ' + m[1], val: parseInt(m[1].replace(/\./g, '')) })).filter(a => a.val >= 10),
     ].filter(a => !isNaN(a.val) && a.val >= 1);
     if (allAmounts.length > 0) {
       allAmounts.sort((a, b) => b.val - a.val);
@@ -1550,15 +1550,28 @@ JSON:
       s.is_financial = true;
     }
 
-    // Context: "achterstand" gevolgd door bedrag op volgende regel
+    // Context: "achterstand"/"schuld"/"bedrag" + getal op zelfde of volgende 1-2 regels
     if (!s.debt_amount) {
-      const achtIdx = lines.findIndex(l => /^achterstand/i.test(l));
-      if (achtIdx >= 0 && achtIdx < lines.length - 1) {
-        const nextLine = lines[achtIdx + 1];
-        const ctxAmt = nextLine.match(/^(\d[\d.]*)/);
-        if (ctxAmt) {
-          const val = parseInt(ctxAmt[1].replace(/\./g, ''));
-          if (val >= 1) { s.debt_amount = '€ ' + ctxAmt[1]; s.is_financial = true; }
+      const achtIdx = lines.findIndex(l => /\b(achterstand|openstaand bedrag|schuld bedrag)\b/i.test(l));
+      if (achtIdx >= 0) {
+        // zelfde regel: "achterstand: 1000"
+        const sameLine = lines[achtIdx].match(/(?:achterstand|bedrag)[:\s]+(\d[\d.,]*)/i);
+        if (sameLine) {
+          const val = parseInt(sameLine[1].replace(/[.,]/g, ''));
+          if (val >= 10) { s.debt_amount = '€ ' + sameLine[1].replace(/[.,\-–]+$/, ''); s.is_financial = true; }
+        }
+        // volgende 1-2 regels: lijn die begint met (of uitsluitend) een getal
+        if (!s.debt_amount) {
+          for (let i = achtIdx + 1; i <= Math.min(achtIdx + 2, lines.length - 1) && !s.debt_amount; i++) {
+            const numLine = lines[i].match(/^(\d[\d.,\s]*)/);
+            if (numLine) {
+              const digits = numLine[1].replace(/[.,\s]/g, '');
+              if (/^\d{2,7}$/.test(digits)) {
+                const val = parseInt(digits);
+                if (val >= 10) { s.debt_amount = '€ ' + numLine[1].trim().replace(/[.,\-–]+$/, ''); s.is_financial = true; }
+              }
+            }
+          }
         }
       }
     }
@@ -1585,7 +1598,9 @@ JSON:
     if (refMatch) s.reference = refMatch[1].trim().split('\n')[0].trim();
 
     // ── Vervaldatum ───────────────────────────────────────────────────────────
-    const duePat = /(?:vervaldatum|uiterste betaaldatum|uiterlijk betalen|te betalen(?:\s+v[oó][oó]r)?|betalen v[oó][oó]r|v[oó][oó]r|uiterlijk|te voldoen(?:\s+v[oó][oó]r)?|dient(?:\s+te worden)?\s+voldaan(?:\s+v[oó][oó]r)?|voldaan\s+v[oó][oó]r|betaaldatum)[:\s]+(\d{1,2}[\s\-\/]\d{1,2}[\s\-\/]\d{2,4}|\d{1,2}\s+\w{3,9}\.?\s+\d{4})/i;
+    const dueDateLabel = /(?:vervaldatum|uiterste\s+betaaldatum|betaaldatum|uiterlijk\s+betalen|te\s+betalen\s+v[oó]{1,2}r|betalen\s+v[oó]{1,2}r|betalen\s+voor|v[oó]{1,2}r|uiterlijk|te\s+voldoen(?:\s+v[oó]{1,2}r)?|dient(?:\s+te\s+worden)?\s+voldaan(?:\s+v[oó]{1,2}r)?|voldaan\s+v[oó]{1,2}r)/i;
+    const dueDateVal  = /(\d{1,2}[\s\-\/\.]\d{1,2}[\s\-\/\.]\d{2,4}|\d{1,2}\s+\w{3,9}\.?\s*\d{0,4})/;
+    const duePat = new RegExp(dueDateLabel.source + '[:\\s]+' + dueDateVal.source, 'i');
     const dueMatch = text.match(duePat);
     if (dueMatch) s.due_date = dueMatch[1].trim();
 
