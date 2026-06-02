@@ -1538,13 +1538,29 @@ JSON:
 
     // ── Bedrag ────────────────────────────────────────────────────────────────
     const allAmounts = [
+      // Formeel: € 1.234,56 of 1234 EUR
       ...[...text.matchAll(/€\s*([\d.]+(?:,\d{1,2})?)/g)].map(m => ({ display: '€ ' + m[1], val: parseFloat(m[1].replace(/\./g, '').replace(',', '.')) })),
       ...[...text.matchAll(/\b([\d.]+(?:,\d{1,2})?)\s*(?:euro|EUR)\b/gi)].map(m => ({ display: '€ ' + m[1], val: parseFloat(m[1].replace(/\./g, '').replace(',', '.')) })),
-    ].filter(a => !isNaN(a.val) && a.val > 0);
+      // Informeel: 1000,- of 1.000,- (Nederlandse notatie voor geen centen)
+      ...[...text.matchAll(/\b(\d[\d.]*),\s*[-–]/g)].map(m => ({ display: '€ ' + m[1], val: parseInt(m[1].replace(/\./g, '')) })),
+    ].filter(a => !isNaN(a.val) && a.val >= 1);
     if (allAmounts.length > 0) {
       allAmounts.sort((a, b) => b.val - a.val);
       s.debt_amount = allAmounts[0].display;
       s.is_financial = true;
+    }
+
+    // Context: "achterstand" gevolgd door bedrag op volgende regel
+    if (!s.debt_amount) {
+      const achtIdx = lines.findIndex(l => /^achterstand/i.test(l));
+      if (achtIdx >= 0 && achtIdx < lines.length - 1) {
+        const nextLine = lines[achtIdx + 1];
+        const ctxAmt = nextLine.match(/^(\d[\d.]*)/);
+        if (ctxAmt) {
+          const val = parseInt(ctxAmt[1].replace(/\./g, ''));
+          if (val >= 1) { s.debt_amount = '€ ' + ctxAmt[1]; s.is_financial = true; }
+        }
+      }
     }
 
     // ── IBAN / Rekeningnummer ─────────────────────────────────────────────────
@@ -1578,15 +1594,22 @@ JSON:
     if (senderMatch) {
       s.creditor_name = senderMatch[1].trim().split('\n')[0].trim();
     }
+    // Handgeschreven brief: "groet" gevolgd door naam = afzender/schuldeiser
+    if (!s.creditor_name) {
+      const greetIdx = lines.findIndex(l => /^groe[td]/i.test(l));
+      if (greetIdx >= 0 && greetIdx < lines.length - 1) {
+        s.creditor_name = lines.slice(greetIdx + 1).join(', ').trim();
+      }
+    }
     if (!s.creditor_name) {
       const companyLine = lines.find(l =>
-        /\b(B\.?V\.?|N\.?V\.?|V\.?O\.?F\.?|stichting|incasso|gerechtsdeurwaarder|deurwaarder|holding|groep|group|Ltd|GmbH)\b/i.test(l)
+        /\b(B\.?V\.?|N\.?V\.?|V\.?O\.?F\.?|stichting|incasso|gerechtsdeurwaarder|deurwaarder|holding|groep|group|Ltd|GmbH|jewels|jewelry)\b/i.test(l)
         && l.length < 70
       );
       if (companyLine) s.creditor_name = companyLine;
     }
     if (!s.creditor_name) {
-      const stopWords = /^(datum|aan|van|betreft|re|subject|dear|geachte|beste|kenmerk|iban|btw|kvk|t\.a\.v|postbus|p\.o\.box|\d)/i;
+      const stopWords = /^(datum|aan|van|betreft|re|subject|dear|geachte|beste|kenmerk|iban|btw|kvk|t\.a\.v|postbus|p\.o\.box|belang|groet|\d)/i;
       const nameLine = lines.find(l => l.length > 3 && l.length < 60 && !stopWords.test(l) && /[a-z]/i.test(l));
       if (nameLine) s.creditor_name = nameLine;
     }
@@ -1613,7 +1636,8 @@ JSON:
     if (!s.is_financial) {
       const kwds = ['factuur', 'rekening', 'schuld', 'vordering', 'incasso',
         'betalingsherinnering', 'aanmaning', 'herinnering', 'openstaand',
-        'te betalen', 'invoice', 'overdue', 'deurwaarder', 'creditnota'];
+        'te betalen', 'invoice', 'overdue', 'deurwaarder', 'creditnota',
+        'achterstand', 'niet betalen', 'betaling'];
       if (kwds.some(kw => lower.includes(kw))) s.is_financial = true;
     }
 
