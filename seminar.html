@@ -1321,13 +1321,13 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     try {
       const compressed = await compressImageForAzure(scanImageBase64, scanImageMime);
 
-      document.getElementById('scan-loading-msg').textContent = 'Azure Vision analyseert…';
+      document.getElementById('scan-loading-msg').textContent = 'Azure leest handschrift… (kan 5-15 sec duren)';
 
       const binary = atob(compressed);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
-      const resp = await fetch(`${workerUrl}/azure-ocr`, {
+      const resp = await fetch(`${workerUrl}/azure-read`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/octet-stream' },
         body: bytes.buffer,
@@ -1343,14 +1343,14 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
         throw new Error(`HTTP ${status}${code ? '\nCode: ' + code : ''}\nBericht: ${msg}\n\nVolledige Azure respons:\n${JSON.stringify(azureRaw, null, 2)}`);
       }
 
-      const data = azureRaw;
+      if (azureRaw.status === 'failed') {
+        throw new Error(`Azure Read API mislukt.\n\nVolledige respons:\n${JSON.stringify(azureRaw, null, 2)}`);
+      }
 
-      // Flatten Azure OCR response to plain text (double newline between regions preserves document structure)
-      const text = (data.regions || [])
-        .map(r => (r.lines || [])
-          .map(l => (l.words || []).map(w => w.text).join(' '))
-          .join('\n'))
-        .join('\n\n');
+      // Read API: analyzeResult.readResults[].lines[].text
+      const text = (azureRaw.analyzeResult?.readResults || [])
+        .flatMap(page => (page.lines || []).map(l => l.text))
+        .join('\n');
 
       const structured = extractFinancialFromText(text);
       showScanResult(text.trim(), structured);
