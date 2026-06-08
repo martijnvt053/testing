@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
+  <iq:application entry="HalloApp" id="a3484187-6dce-4e52-b8fe-123456789abc" launchLabel="Hallo" minSdkVersion="3.2.0" name="@Strings.AppName" type="watchapp" version="1.0.0">
+    <iq:products>
+      <iq:product id="venu4"/>
+    </iq:products>
+    <iq:permissions/>
+    <iq:languages>
+      <iq:language>dut</iq:language>
+      <iq:language>eng</iq:language>
+    </iq:languages>
+  </iq:application>
+</iq:manifest>
