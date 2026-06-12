@@ -1578,9 +1578,9 @@ JSON:
 
     // ── IBAN / Rekeningnummer ─────────────────────────────────────────────────
     // Probeer eerst gelabeld (Rekeningnummer:, IBAN:, Bankrekening:)
-    const ibanLabelMatch = text.match(/(?:rekeningnummer|bankrekening|iban|bank(?:rek(?:ening)?)?\.?\s*(?:nr\.?)?)[:\s]+([A-Z]{2}[\d\s]{2}[\sA-Z0-9]{8,28}|[\d][\d\s\-]{6,18})/i);
+    const ibanLabelMatch = text.match(/(?:rekeningnummer|bankrekening|iban|bank(?:rek(?:ening)?)?\.?\s*(?:nr\.?)?)[:\s]+([A-Z]{2}[\d ]{2}[ A-Z0-9]{8,26}|[\d][\d \-]{6,18})/i);
     if (ibanLabelMatch) {
-      const raw = ibanLabelMatch[1].trim().replace(/\s+/g, ' ');
+      const raw = ibanLabelMatch[1].split('\n')[0].trim().replace(/\s+/g, ' ');
       s.iban = raw;
       s.is_financial = true;
     } else {
@@ -1600,20 +1600,23 @@ JSON:
     // ── Vervaldatum ───────────────────────────────────────────────────────────
     const dueDateLabel = /(?:vervaldatum|uiterste\s+betaaldatum|betaaldatum|uiterlijk\s+betalen|te\s+betalen\s+v[oó]{1,2}r|betalen\s+v[oó]{1,2}r|betalen\s+voor|v[oó]{1,2}r|uiterlijk|te\s+voldoen(?:\s+v[oó]{1,2}r)?|dient(?:\s+te\s+worden)?\s+voldaan(?:\s+v[oó]{1,2}r)?|voldaan\s+v[oó]{1,2}r)/i;
     const dueDateVal  = /(\d{1,2}[\s\-\/\.]\d{1,2}[\s\-\/\.]\d{2,4}|\d{1,2}\s+\w{3,9}\.?\s*\d{0,4})/;
-    const duePat = new RegExp(dueDateLabel.source + '[:\\s]+' + dueDateVal.source, 'i');
+    // Allow up to 3 optional words (e.g. "op vrijdag") between label and date
+    const duePat = new RegExp(dueDateLabel.source + '[:\\s]+(?:[\\w,]+\\s+){0,3}' + dueDateVal.source, 'i');
     const dueMatch = text.match(duePat);
     if (dueMatch) s.due_date = dueMatch[1].trim();
 
     // ── Schuldeiser naam ──────────────────────────────────────────────────────
-    const senderMatch = text.match(/(?:^|\n)(?:van|afzender|schuldeiser|crediteur)[:\s]+(.{2,60})/im);
+    // "rekeninghouder:" of "Van:" (met dwingend dubbele punt) als label
+    const senderMatch = text.match(/(?:^|\n)(?:rekeninghouder|afzender|schuldeiser|crediteur|van):\s*(.{2,60})/im);
     if (senderMatch) {
       s.creditor_name = senderMatch[1].trim().split('\n')[0].trim();
     }
-    // Handgeschreven brief: "groet" gevolgd door naam = afzender/schuldeiser
+    // Getypte brief: valedictie "Met vriendelijke groet" of handgeschreven "groet"
     if (!s.creditor_name) {
-      const greetIdx = lines.findIndex(l => /^groe[td]/i.test(l));
+      const greetIdx = lines.findIndex(l => /groe[td],?\s*$/i.test(l));
       if (greetIdx >= 0 && greetIdx < lines.length - 1) {
-        s.creditor_name = lines.slice(greetIdx + 1).join(', ').trim();
+        const afterGreet = lines[greetIdx + 1].trim();
+        if (afterGreet.length > 1 && afterGreet.length < 70) s.creditor_name = afterGreet;
       }
     }
     if (!s.creditor_name) {
@@ -1640,7 +1643,7 @@ JSON:
     }
 
     // ── Telefoon ──────────────────────────────────────────────────────────────
-    const telMatch = text.match(/(?:tel(?:efoon)?\.?|t\.?|phone|mob(?:iel)?\.?|fax)[:\s]+([\+\d][\d\s\-\(\)\.]{5,20})/i);
+    const telMatch = text.match(/\b(?:telefoon|tel\.?|phone|mobiel|mob\.?|gsm|fax)[:\s]+([\+\d][\d \-\(\)\.]{5,20})/i);
     if (telMatch) s.creditor_phone = telMatch[1].trim().replace(/\s+/g, ' ');
 
     // ── E-mail ────────────────────────────────────────────────────────────────
