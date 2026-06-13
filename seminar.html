@@ -1308,27 +1308,25 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
   let scanImageMime = 'image/jpeg';
   let cameraStream = null;
 
+  function openNativeCamera() {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment';
+    inp.onchange = () => onScanFile(inp);
+    inp.click();
+  }
+
   async function openCameraModal() {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      document.getElementById('scan-input').click();
-      return;
-    }
+    if (!navigator.mediaDevices?.getUserMedia) { openNativeCamera(); return; }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
       });
       cameraStream = stream;
-      const modal = document.getElementById('camera-modal');
       const video = document.getElementById('camera-video');
       video.srcObject = stream;
-      modal.classList.add('open');
-      video.onloadedmetadata = () => {
-        video.play();
-        requestAnimationFrame(drawLiveGuide);
-      };
-    } catch (_) {
-      document.getElementById('scan-input').click();
-    }
+      document.getElementById('camera-modal').classList.add('open');
+      video.onloadedmetadata = () => { video.play(); requestAnimationFrame(drawLiveGuide); };
+    } catch (_) { openNativeCamera(); }
   }
 
   function closeCameraModal() {
@@ -1336,7 +1334,10 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     document.getElementById('camera-modal').classList.remove('open');
   }
 
-  let guideActive = false;
+  // Live document bounds (fractioneel 0-1), gestart op veilige marge
+  let liveB = { l: 0.06, t: 0.06, r: 0.94, b: 0.94 };
+  let lastDetect = 0;
+
   function drawLiveGuide() {
     const video = document.getElementById('camera-video');
     const canvas = document.getElementById('camera-guide-canvas');
@@ -1346,19 +1347,28 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     const H = canvas.offsetHeight || video.offsetHeight;
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
 
+    // Detecteer documentranden elke 600ms
+    const now = Date.now();
+    if (now - lastDetect > 600) {
+      lastDetect = now;
+      const tmp = document.createElement('canvas');
+      tmp.width = 120; tmp.height = 160;
+      tmp.getContext('2d').drawImage(video, 0, 0, 120, 160);
+      const d = detectDocumentBounds(tmp);
+      // Zachte overgang (lerp 30%)
+      const lr = (a, b) => a + (b - a) * 0.35;
+      liveB = { l: lr(liveB.l, d.l), t: lr(liveB.t, d.t), r: lr(liveB.r, d.r), b: lr(liveB.b, d.b) };
+    }
+
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, W, H);
 
-    // Guide rectangle: A4 proporties, 88% breedte
-    const gw = W * 0.88;
-    const gh = Math.min(gw * 1.414, H * 0.80); // A4 ratio
-    const gx = (W - gw) / 2;
-    const gy = (H - gh) / 2 - H * 0.03;
+    const gx = liveB.l * W, gy = liveB.t * H;
+    const gw = (liveB.r - liveB.l) * W, gh = (liveB.b - liveB.t) * H;
 
     // Donkere overlay buiten document
-    ctx.fillStyle = 'rgba(0,0,0,0.42)';
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
     ctx.fillRect(0, 0, W, H);
-    // Uitsparing voor document
     ctx.clearRect(gx, gy, gw, gh);
 
     // Paarse rand
@@ -1385,8 +1395,8 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     raw.height = video.videoHeight || 720;
     raw.getContext('2d').drawImage(video, 0, 0);
 
-    // Detecteer en snidje bij tot document
-    const b = detectDocumentBounds(raw);
+    // Gebruik live gedetecteerde grenzen + kleine marge
+    const b = liveB;
     const full = (b.r - b.l) > 0.92 && (b.b - b.t) > 0.92;
     const pad = 0.015;
     const cx = full ? 0 : Math.max(0, (b.l - pad) * raw.width);
