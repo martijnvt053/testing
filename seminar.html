@@ -1335,7 +1335,7 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
         const b = detectDocumentBounds(tmp);
         const area = (b.r - b.l) * (b.b - b.t);
         // Only crop if the detected document is meaningfully smaller than the full frame
-        if (area < 0.88) {
+        if (area < 0.92) {
           const pad = 0.012;
           const sx = Math.max(0, (b.l - pad)) * W;
           const sy = Math.max(0, (b.t - pad)) * H;
@@ -1360,15 +1360,17 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
   }
 
   function detectDocumentBounds(srcCanvas) {
-    const SW = 160, SH = 200;
+    // Preserve aspect ratio so landscape photos aren't distorted
+    const LONG = 200;
+    const ar = srcCanvas.width / srcCanvas.height;
+    const SW = ar >= 1 ? LONG : Math.round(LONG * ar);
+    const SH = ar >= 1 ? Math.round(LONG / ar) : LONG;
     const tmp = document.createElement('canvas');
     tmp.width = SW; tmp.height = SH;
     tmp.getContext('2d').drawImage(srcCanvas, 0, 0, SW, SH);
     const d = tmp.getContext('2d').getImageData(0, 0, SW, SH).data;
     const lum = (x, y) => { const i=(y*SW+x)*4; return d[i]*.299+d[i+1]*.587+d[i+2]*.114; };
 
-    // Otsu's methode: berekent automatisch de optimale scheiding
-    // tussen document (licht) en achtergrond (donker)
     const hist = new Array(256).fill(0);
     for (let i = 0; i < SW*SH; i++) hist[Math.round(lum(i%SW, Math.floor(i/SW)))]++;
     const N = SW*SH;
