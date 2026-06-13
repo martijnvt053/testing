@@ -1324,8 +1324,36 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     scanImageMime = file.type || 'image/jpeg';
     const reader = new FileReader();
     reader.onload = e => {
-      scanImageBase64 = e.target.result.split(',')[1];
-      showCapturedPreview(e.target.result);
+      const originalUrl = e.target.result;
+      const img = new Image();
+      img.onload = () => {
+        const W = img.naturalWidth, H = img.naturalHeight;
+        const tmp = document.createElement('canvas');
+        tmp.width = W; tmp.height = H;
+        tmp.getContext('2d').drawImage(img, 0, 0);
+
+        const b = detectDocumentBounds(tmp);
+        const area = (b.r - b.l) * (b.b - b.t);
+        // Only crop if the detected document is meaningfully smaller than the full frame
+        if (area < 0.88) {
+          const pad = 0.012;
+          const sx = Math.max(0, (b.l - pad)) * W;
+          const sy = Math.max(0, (b.t - pad)) * H;
+          const sw = Math.min(W - sx, (b.r - b.l + 2 * pad) * W);
+          const sh = Math.min(H - sy, (b.b - b.t + 2 * pad) * H);
+          const cropped = document.createElement('canvas');
+          cropped.width = Math.round(sw); cropped.height = Math.round(sh);
+          cropped.getContext('2d').drawImage(tmp, Math.round(sx), Math.round(sy), Math.round(sw), Math.round(sh), 0, 0, Math.round(sw), Math.round(sh));
+          const croppedUrl = cropped.toDataURL('image/jpeg', 0.92);
+          scanImageBase64 = croppedUrl.split(',')[1];
+          scanImageMime = 'image/jpeg';
+          showCapturedPreview(croppedUrl);
+        } else {
+          scanImageBase64 = originalUrl.split(',')[1];
+          showCapturedPreview(originalUrl);
+        }
+      };
+      img.src = originalUrl;
     };
     reader.readAsDataURL(file);
     input.value = '';
