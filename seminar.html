@@ -574,6 +574,41 @@
       background: #000;
     }
 
+    .scan-preview-wrap {
+      display: none;
+      position: relative;
+      margin-bottom: 12px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+      line-height: 0;
+    }
+
+    #scan-canvas {
+      width: 100%;
+      max-height: 240px;
+      object-fit: contain;
+      border-radius: 10px;
+      display: block;
+    }
+
+    #scan-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      border-radius: 10px;
+    }
+
+    @keyframes scan-line {
+      0%   { transform: translateY(0); opacity: 0.9; }
+      100% { transform: translateY(var(--doc-h, 200px)); opacity: 0; }
+    }
+
+    #camera-modal { display: none; flex-direction: column; position: fixed; inset: 0; z-index: 2000; background: #000; }
+    #camera-modal.open { display: flex; }
+    #camera-shutter:active { transform: scale(0.92); }
+
     .scan-actions { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
     .scan-btn {
       flex: 1; min-width: 80px; padding: 11px 8px; border-radius: 10px; border: none;
@@ -711,16 +746,36 @@
 </div>
 
 <!-- Tab: Documenten scannen -->
+<!-- Camera modal -->
+<div id="camera-modal">
+  <div style="position:relative;flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+    <video id="camera-video" style="width:100%;height:100%;object-fit:cover;" playsinline autoplay muted></video>
+    <canvas id="camera-guide-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;"></canvas>
+    <div id="camera-hint" style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.55);color:white;font-size:13px;padding:6px 14px;border-radius:20px;white-space:nowrap;">Richt op het document</div>
+  </div>
+  <div style="padding:20px 24px 36px;display:flex;align-items:center;justify-content:space-between;background:#111;">
+    <button onclick="closeCameraModal()" style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:white;font-size:22px;cursor:pointer;">✕</button>
+    <button onclick="captureFromCamera()" id="camera-shutter" style="width:72px;height:72px;border-radius:50%;background:white;border:5px solid #5B4FBE;cursor:pointer;box-shadow:0 0 0 3px rgba(91,79,190,0.4);"></button>
+    <button onclick="document.getElementById('gallery-input').click()" style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:white;font-size:22px;cursor:pointer;">🖼️</button>
+  </div>
+</div>
+<input type="file" id="gallery-input" accept="image/*" style="display:none" onchange="onScanFile(this)">
+
 <div class="tab-page" id="tab-scan">
   <div class="scan-page">
-    <input type="file" id="scan-input" accept="image/*" capture="environment" style="display:none" onchange="onScanFile(this)">
+    <input type="file" id="scan-input" accept="image/*" style="display:none" onchange="onScanFile(this)">
 
-    <div class="scan-drop" onclick="document.getElementById('scan-input').click()">
+    <div class="scan-drop" onclick="openCameraModal()">
       <div class="scan-icon">📷</div>
-      <p><strong>Tik om foto te maken</strong><br>of kies een afbeelding uit je galerij</p>
+      <p><strong>Tik om te scannen</strong><br>of kies uit galerij</p>
     </div>
 
-    <img id="scan-preview" class="scan-preview" alt="Preview">
+    <img id="scan-preview" class="scan-preview" alt="Preview" style="display:none">
+
+    <div class="scan-preview-wrap" id="scan-preview-wrap">
+      <canvas id="scan-canvas"></canvas>
+      <canvas id="scan-overlay"></canvas>
+    </div>
 
     <div class="scan-actions" id="scan-actions" style="display:none">
       <button class="scan-btn secondary" onclick="resetScan()">✕ Wis</button>
@@ -1251,6 +1306,123 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
   // ─── Document scan ───────────────────────────────────────────────────────
   let scanImageBase64 = null;
   let scanImageMime = 'image/jpeg';
+  let cameraStream = null;
+
+  async function openCameraModal() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      document.getElementById('scan-input').click();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+      });
+      cameraStream = stream;
+      const modal = document.getElementById('camera-modal');
+      const video = document.getElementById('camera-video');
+      video.srcObject = stream;
+      modal.classList.add('open');
+      video.onloadedmetadata = () => {
+        video.play();
+        requestAnimationFrame(drawLiveGuide);
+      };
+    } catch (_) {
+      document.getElementById('scan-input').click();
+    }
+  }
+
+  function closeCameraModal() {
+    if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+    document.getElementById('camera-modal').classList.remove('open');
+  }
+
+  let guideActive = false;
+  function drawLiveGuide() {
+    const video = document.getElementById('camera-video');
+    const canvas = document.getElementById('camera-guide-canvas');
+    if (!cameraStream || video.readyState < 2) { requestAnimationFrame(drawLiveGuide); return; }
+
+    const W = canvas.offsetWidth || video.offsetWidth;
+    const H = canvas.offsetHeight || video.offsetHeight;
+    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+
+    // Guide rectangle: A4 proporties, 88% breedte
+    const gw = W * 0.88;
+    const gh = Math.min(gw * 1.414, H * 0.80); // A4 ratio
+    const gx = (W - gw) / 2;
+    const gy = (H - gh) / 2 - H * 0.03;
+
+    // Donkere overlay buiten document
+    ctx.fillStyle = 'rgba(0,0,0,0.42)';
+    ctx.fillRect(0, 0, W, H);
+    // Uitsparing voor document
+    ctx.clearRect(gx, gy, gw, gh);
+
+    // Paarse rand
+    ctx.strokeStyle = '#5B4FBE';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(gx, gy, gw, gh);
+
+    // Hoekaccenten
+    const cl = Math.min(gw, gh) * 0.09;
+    ctx.strokeStyle = '#a78bfa';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    [[gx,gy,1,1],[gx+gw,gy,-1,1],[gx,gy+gh,1,-1],[gx+gw,gy+gh,-1,-1]].forEach(([cx,cy,sx,sy]) => {
+      ctx.beginPath(); ctx.moveTo(cx+sx*cl,cy); ctx.lineTo(cx,cy); ctx.lineTo(cx,cy+sy*cl); ctx.stroke();
+    });
+
+    if (cameraStream) requestAnimationFrame(drawLiveGuide);
+  }
+
+  function captureFromCamera() {
+    const video = document.getElementById('camera-video');
+    const raw = document.createElement('canvas');
+    raw.width = video.videoWidth || 1280;
+    raw.height = video.videoHeight || 720;
+    raw.getContext('2d').drawImage(video, 0, 0);
+
+    // Detecteer en snidje bij tot document
+    const b = detectDocumentBounds(raw);
+    const full = (b.r - b.l) > 0.92 && (b.b - b.t) > 0.92;
+    const pad = 0.015;
+    const cx = full ? 0 : Math.max(0, (b.l - pad) * raw.width);
+    const cy = full ? 0 : Math.max(0, (b.t - pad) * raw.height);
+    const cw = full ? raw.width  : Math.min(raw.width  - cx, (b.r - b.l + 2*pad) * raw.width);
+    const ch = full ? raw.height : Math.min(raw.height - cy, (b.b - b.t + 2*pad) * raw.height);
+
+    const cropped = document.createElement('canvas');
+    cropped.width = cw; cropped.height = ch;
+    cropped.getContext('2d').drawImage(raw, cx, cy, cw, ch, 0, 0, cw, ch);
+
+    const dataUrl = cropped.toDataURL('image/jpeg', 0.88);
+    scanImageBase64 = dataUrl.split(',')[1];
+    scanImageMime = 'image/jpeg';
+
+    closeCameraModal();
+    showCapturedPreview(dataUrl);
+  }
+
+  function showCapturedPreview(dataUrl) {
+    const img = new Image();
+    img.onload = () => {
+      const wrap = document.getElementById('scan-preview-wrap');
+      const canvas = document.getElementById('scan-canvas');
+      const MAX_H = 240;
+      const ratio = img.naturalWidth / img.naturalHeight;
+      canvas.height = Math.min(img.naturalHeight, MAX_H);
+      canvas.width = Math.round(canvas.height * ratio);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      wrap.style.display = 'block';
+      document.getElementById('scan-actions').style.display = 'flex';
+      document.getElementById('scan-result').style.display = 'none';
+      requestAnimationFrame(() => drawDocumentFrame(img, canvas));
+    };
+    img.src = dataUrl;
+  }
 
   function onScanFile(input) {
     const file = input.files[0];
@@ -1258,24 +1430,110 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     scanImageMime = file.type || 'image/jpeg';
     const reader = new FileReader();
     reader.onload = e => {
-      const dataUrl = e.target.result;
-      scanImageBase64 = dataUrl.split(',')[1];
-      const preview = document.getElementById('scan-preview');
-      preview.src = dataUrl;
-      preview.style.display = 'block';
-      document.getElementById('scan-actions').style.display = 'flex';
-      document.getElementById('scan-result').style.display = 'none';
+      scanImageBase64 = e.target.result.split(',')[1];
+      showCapturedPreview(e.target.result);
     };
     reader.readAsDataURL(file);
     input.value = '';
   }
 
+  function detectDocumentBounds(canvas) {
+    const SW = 120, SH = 160;
+    const tmp = document.createElement('canvas');
+    tmp.width = SW; tmp.height = SH;
+    const tc = tmp.getContext('2d');
+    tc.drawImage(canvas, 0, 0, SW, SH);
+    const d = tc.getImageData(0, 0, SW, SH).data;
+    const lum = (x, y) => { const i=(y*SW+x)*4; return d[i]*.299+d[i+1]*.587+d[i+2]*.114; };
+    const THR = 130, MIN = 0.3;
+    let top=0, bot=SH-1, lft=0, rgt=SW-1;
+    for(let y=0;y<SH;y++) { let n=0; for(let x=0;x<SW;x++) if(lum(x,y)>THR)n++; if(n/SW>MIN){top=y;break;} }
+    for(let y=SH-1;y>=0;y--) { let n=0; for(let x=0;x<SW;x++) if(lum(x,y)>THR)n++; if(n/SW>MIN){bot=y;break;} }
+    for(let x=0;x<SW;x++) { let n=0; for(let y=top;y<=bot;y++) if(lum(x,y)>THR)n++; if(n/(bot-top+1)>MIN){lft=x;break;} }
+    for(let x=SW-1;x>=0;x--) { let n=0; for(let y=top;y<=bot;y++) if(lum(x,y)>THR)n++; if(n/(bot-top+1)>MIN){rgt=x;break;} }
+    const PAD = 0.01;
+    return {
+      t: Math.max(0, top/SH - PAD),
+      b: Math.min(1, bot/SH + PAD),
+      l: Math.max(0, lft/SW - PAD),
+      r: Math.min(1, rgt/SW + PAD),
+    };
+  }
+
+  function drawDocumentFrame(img, srcCanvas) {
+    const ov = document.getElementById('scan-overlay');
+    ov.width = srcCanvas.offsetWidth || srcCanvas.width;
+    ov.height = srcCanvas.offsetHeight || srcCanvas.height;
+    const ctx = ov.getContext('2d');
+    const W = ov.width, H = ov.height;
+
+    const b = detectDocumentBounds(srcCanvas);
+    // Fall back to small inset if no clear document found
+    const FULL = (b.r - b.l) > 0.9 && (b.b - b.t) > 0.9;
+    const x = FULL ? W * 0.03 : b.l * W;
+    const y = FULL ? H * 0.03 : b.t * H;
+    const w = FULL ? W * 0.94 : (b.r - b.l) * W;
+    const h = FULL ? H * 0.94 : (b.b - b.t) * H;
+
+    // Outer dim
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.clearRect(x, y, w, h);
+
+    // Border
+    ctx.strokeStyle = '#5B4FBE';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+
+    // Corner accents
+    const cl = Math.min(w, h) * 0.10;
+    ctx.strokeStyle = '#7c6fe0';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    const corners = [[x,y,1,1],[x+w,y,-1,1],[x,y+h,1,-1],[x+w,y+h,-1,-1]];
+    for (const [cx,cy,sx,sy] of corners) {
+      ctx.beginPath(); ctx.moveTo(cx + sx*cl, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + sy*cl); ctx.stroke();
+    }
+
+    // Animated scan line (CSS)
+    animateScanLine(x, y, w, h, W, H);
+  }
+
+  function animateScanLine(dx, dy, dw, dh, W, H) {
+    const ov = document.getElementById('scan-overlay');
+    const ctx = ov.getContext('2d');
+    const start = performance.now();
+    const dur = 900;
+    function frame(now) {
+      const t = Math.min((now - start) / dur, 1);
+      if (t >= 1) return;
+      // Redraw frame (clear scan-line area only)
+      ctx.clearRect(dx, dy + 1, dw, dh - 2);
+      // Scan line
+      const lineY = dy + t * dh;
+      const grad = ctx.createLinearGradient(0, lineY - 12, 0, lineY + 4);
+      grad.addColorStop(0, 'rgba(91,79,190,0)');
+      grad.addColorStop(0.7, 'rgba(91,79,190,0.35)');
+      grad.addColorStop(1, 'rgba(91,79,190,0.7)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(dx + 1, lineY - 12, dw - 2, 16);
+      // Solid line
+      ctx.strokeStyle = 'rgba(124,111,224,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(dx + 1, lineY); ctx.lineTo(dx + dw - 1, lineY); ctx.stroke();
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
   function resetScan() {
     scanImageBase64 = null;
-    document.getElementById('scan-preview').style.display = 'none';
+    document.getElementById('scan-preview-wrap').style.display = 'none';
     document.getElementById('scan-actions').style.display = 'none';
     document.getElementById('scan-result').style.display = 'none';
     document.getElementById('scan-loading').style.display = 'none';
+    const ov = document.getElementById('scan-overlay');
+    ov.getContext('2d').clearRect(0, 0, ov.width, ov.height);
   }
 
   function setScanBusy(busy) {
