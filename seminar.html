@@ -1457,11 +1457,12 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     const d = tmp.getContext('2d').getImageData(0, 0, SW, SH).data;
     const lum = (x, y) => { const i=(y*SW+x)*4; return d[i]*.299+d[i+1]*.587+d[i+2]*.114; };
 
-    // Adaptieve drempelwaarde: 60% tussen donkerste en lichtste pixel
+    // Adaptieve drempelwaarde: 45% tussen donkerste en lichtste pixel
+    // MIN laag zodat rijen met veel tekst (minder wit) ook meedoen
     let mn = 255, mx = 0;
     for (let i = 0; i < SW*SH; i++) { const v = lum(i % SW, Math.floor(i/SW)); if(v<mn)mn=v; if(v>mx)mx=v; }
-    const THR = mn + (mx - mn) * 0.60;
-    const MIN = 0.40; // minstens 40% van rij/kolom moet boven drempel zijn
+    const THR = mn + (mx - mn) * 0.45;
+    const MIN = 0.20;
 
     let top=0, bot=SH-1, lft=0, rgt=SW-1;
     for(let y=0;y<SH;y++)    { let n=0; for(let x=0;x<SW;x++) if(lum(x,y)>THR)n++; if(n/SW>=MIN){top=y;break;} }
@@ -1470,10 +1471,10 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     for(let x=SW-1;x>=0;x--) { let n=0; for(let y=top;y<=bot;y++) if(lum(x,y)>THR)n++; if(n/(bot-top+1)>=MIN){rgt=x;break;} }
 
     return {
-      t: Math.max(0,   top/SH - 0.008),
-      b: Math.min(1,   bot/SH + 0.008),
-      l: Math.max(0,   lft/SW - 0.008),
-      r: Math.min(1,   rgt/SW + 0.008),
+      t: Math.max(0,   top/SH - 0.018),
+      b: Math.min(1,   bot/SH + 0.018),
+      l: Math.max(0,   lft/SW - 0.018),
+      r: Math.min(1,   rgt/SW + 0.018),
     };
   }
 
