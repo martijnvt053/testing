@@ -1449,7 +1449,6 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
   }
 
   function detectDocumentBounds(srcCanvas) {
-    // Schaal naar kleine canvas zodat detectie snel is
     const SW = 160, SH = 200;
     const tmp = document.createElement('canvas');
     tmp.width = SW; tmp.height = SH;
@@ -1457,12 +1456,22 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     const d = tmp.getContext('2d').getImageData(0, 0, SW, SH).data;
     const lum = (x, y) => { const i=(y*SW+x)*4; return d[i]*.299+d[i+1]*.587+d[i+2]*.114; };
 
-    // Adaptieve drempelwaarde: 45% tussen donkerste en lichtste pixel
-    // MIN laag zodat rijen met veel tekst (minder wit) ook meedoen
-    let mn = 255, mx = 0;
-    for (let i = 0; i < SW*SH; i++) { const v = lum(i % SW, Math.floor(i/SW)); if(v<mn)mn=v; if(v>mx)mx=v; }
-    const THR = mn + (mx - mn) * 0.45;
-    const MIN = 0.20;
+    // Otsu's methode: berekent automatisch de optimale scheiding
+    // tussen document (licht) en achtergrond (donker)
+    const hist = new Array(256).fill(0);
+    for (let i = 0; i < SW*SH; i++) hist[Math.round(lum(i%SW, Math.floor(i/SW)))]++;
+    const N = SW*SH;
+    let sum = 0; for (let i=0;i<256;i++) sum += i*hist[i];
+    let sumB=0, wB=0, maxVar=0, THR=128;
+    for (let t=0;t<256;t++) {
+      wB += hist[t]; if (!wB) continue;
+      const wF = N-wB; if (!wF) break;
+      sumB += t*hist[t];
+      const mB=sumB/wB, mF=(sum-sumB)/wF;
+      const v = wB*wF*(mB-mF)**2;
+      if (v > maxVar) { maxVar=v; THR=t; }
+    }
+    const MIN = 0.25;
 
     let top=0, bot=SH-1, lft=0, rgt=SW-1;
     for(let y=0;y<SH;y++)    { let n=0; for(let x=0;x<SW;x++) if(lum(x,y)>THR)n++; if(n/SW>=MIN){top=y;break;} }
