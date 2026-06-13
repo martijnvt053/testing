@@ -1347,16 +1347,17 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     const H = canvas.offsetHeight || video.offsetHeight;
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
 
-    // Detecteer documentranden elke 600ms
+    // Detecteer documentranden elke 350ms
     const now = Date.now();
-    if (now - lastDetect > 600) {
+    if (now - lastDetect > 350) {
       lastDetect = now;
       const tmp = document.createElement('canvas');
-      tmp.width = 120; tmp.height = 160;
-      tmp.getContext('2d').drawImage(video, 0, 0, 120, 160);
+      const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+      tmp.width = 160; tmp.height = Math.round(160 * vh / vw) || 200;
+      tmp.getContext('2d').drawImage(video, 0, 0, tmp.width, tmp.height);
       const d = detectDocumentBounds(tmp);
-      // Zachte overgang (lerp 30%)
-      const lr = (a, b) => a + (b - a) * 0.35;
+      // Zachte overgang (lerp 45%) — sneller reageren op documentpositie
+      const lr = (a, b) => a + (b - a) * 0.45;
       liveB = { l: lr(liveB.l, d.l), t: lr(liveB.t, d.t), r: lr(liveB.r, d.r), b: lr(liveB.b, d.b) };
     }
 
@@ -1447,26 +1448,32 @@ Schrijf een beknopte samenvatting in het Nederlands van maximaal 5 bulletpoints.
     input.value = '';
   }
 
-  function detectDocumentBounds(canvas) {
-    const SW = 120, SH = 160;
+  function detectDocumentBounds(srcCanvas) {
+    // Schaal naar kleine canvas zodat detectie snel is
+    const SW = 160, SH = 200;
     const tmp = document.createElement('canvas');
     tmp.width = SW; tmp.height = SH;
-    const tc = tmp.getContext('2d');
-    tc.drawImage(canvas, 0, 0, SW, SH);
-    const d = tc.getImageData(0, 0, SW, SH).data;
+    tmp.getContext('2d').drawImage(srcCanvas, 0, 0, SW, SH);
+    const d = tmp.getContext('2d').getImageData(0, 0, SW, SH).data;
     const lum = (x, y) => { const i=(y*SW+x)*4; return d[i]*.299+d[i+1]*.587+d[i+2]*.114; };
-    const THR = 130, MIN = 0.3;
+
+    // Adaptieve drempelwaarde: 60% tussen donkerste en lichtste pixel
+    let mn = 255, mx = 0;
+    for (let i = 0; i < SW*SH; i++) { const v = lum(i % SW, Math.floor(i/SW)); if(v<mn)mn=v; if(v>mx)mx=v; }
+    const THR = mn + (mx - mn) * 0.60;
+    const MIN = 0.40; // minstens 40% van rij/kolom moet boven drempel zijn
+
     let top=0, bot=SH-1, lft=0, rgt=SW-1;
-    for(let y=0;y<SH;y++) { let n=0; for(let x=0;x<SW;x++) if(lum(x,y)>THR)n++; if(n/SW>MIN){top=y;break;} }
-    for(let y=SH-1;y>=0;y--) { let n=0; for(let x=0;x<SW;x++) if(lum(x,y)>THR)n++; if(n/SW>MIN){bot=y;break;} }
-    for(let x=0;x<SW;x++) { let n=0; for(let y=top;y<=bot;y++) if(lum(x,y)>THR)n++; if(n/(bot-top+1)>MIN){lft=x;break;} }
-    for(let x=SW-1;x>=0;x--) { let n=0; for(let y=top;y<=bot;y++) if(lum(x,y)>THR)n++; if(n/(bot-top+1)>MIN){rgt=x;break;} }
-    const PAD = 0.01;
+    for(let y=0;y<SH;y++)    { let n=0; for(let x=0;x<SW;x++) if(lum(x,y)>THR)n++; if(n/SW>=MIN){top=y;break;} }
+    for(let y=SH-1;y>=0;y--) { let n=0; for(let x=0;x<SW;x++) if(lum(x,y)>THR)n++; if(n/SW>=MIN){bot=y;break;} }
+    for(let x=0;x<SW;x++)    { let n=0; for(let y=top;y<=bot;y++) if(lum(x,y)>THR)n++; if(n/(bot-top+1)>=MIN){lft=x;break;} }
+    for(let x=SW-1;x>=0;x--) { let n=0; for(let y=top;y<=bot;y++) if(lum(x,y)>THR)n++; if(n/(bot-top+1)>=MIN){rgt=x;break;} }
+
     return {
-      t: Math.max(0, top/SH - PAD),
-      b: Math.min(1, bot/SH + PAD),
-      l: Math.max(0, lft/SW - PAD),
-      r: Math.min(1, rgt/SW + PAD),
+      t: Math.max(0,   top/SH - 0.008),
+      b: Math.min(1,   bot/SH + 0.008),
+      l: Math.max(0,   lft/SW - 0.008),
+      r: Math.min(1,   rgt/SW + 0.008),
     };
   }
 
