@@ -54,15 +54,6 @@ export default {
     if (pathname === '/azure-read' && request.method === 'POST') {
       return handleAzureRead(request, env);
     }
-    if (pathname === '/login' && request.method === 'POST') {
-      return handleLogin(request, env);
-    }
-    if (pathname === '/verify' && request.method === 'GET') {
-      return handleVerify(request, env);
-    }
-    if (pathname === '/setup-user' && request.method === 'POST') {
-      return handleSetupUser(request, env);
-    }
 
     return new Response('Not Found', { status: 404, headers: CORS });
   },
@@ -332,58 +323,6 @@ async function handleAzureRead(request, env) {
   return new Response(JSON.stringify({ error: 'Azure Read API time-out na 22 seconden' }), {
     status: 504, headers: { ...CORS, 'Content-Type': 'application/json' },
   });
-}
-
-// ─── Auth ─────────────────────────────────────────────────────────────────────
-
-async function handleLogin(request, env) {
-  try {
-    const { email, password } = await request.json();
-    const stored = await env.MSG.get(`user:${(email || '').toLowerCase()}`);
-    if (!stored) return new Response('Unauthorized', { status: 401, headers: CORS });
-    const { salt, hash } = JSON.parse(stored);
-    if ((await hashPw(password, salt)) !== hash) {
-      return new Response('Unauthorized', { status: 401, headers: CORS });
-    }
-    const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-      .map(b => b.toString(16).padStart(2, '0')).join('');
-    await env.MSG.put(`session:${token}`, email.toLowerCase(), { expirationTtl: 60 * 60 * 24 * 30 });
-    return new Response(JSON.stringify({ token }), {
-      headers: { ...CORS, 'Content-Type': 'application/json' },
-    });
-  } catch {
-    return new Response('Unauthorized', { status: 401, headers: CORS });
-  }
-}
-
-async function handleVerify(request, env) {
-  const auth = request.headers.get('Authorization') || '';
-  const token = auth.replace('Bearer ', '').trim();
-  if (!token) return new Response('Unauthorized', { status: 401, headers: CORS });
-  const email = await env.MSG.get(`session:${token}`);
-  if (!email) return new Response('Unauthorized', { status: 401, headers: CORS });
-  return new Response(JSON.stringify({ email }), {
-    headers: { ...CORS, 'Content-Type': 'application/json' },
-  });
-}
-
-async function handleSetupUser(request, env) {
-  const auth = request.headers.get('Authorization') || '';
-  if (auth !== `Bearer ${env.ADMIN_KEY}`) {
-    return new Response('Unauthorized', { status: 401, headers: CORS });
-  }
-  const { email, password } = await request.json();
-  const salt = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-    .map(b => b.toString(16).padStart(2, '0')).join('');
-  const hash = await hashPw(password, salt);
-  await env.MSG.put(`user:${email.toLowerCase()}`, JSON.stringify({ salt, hash }));
-  return new Response('OK', { headers: CORS });
-}
-
-async function hashPw(password, salt) {
-  const data = new TextEncoder().encode(`${salt}:${password}`);
-  const buf = await crypto.subtle.digest('SHA-256', data);
-  return btoa(String.fromCharCode(...new Uint8Array(buf)));
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
