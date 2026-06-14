@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fincent AI</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: #f5f5fa;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #1a1a2e;
+    }
+    header {
+      background: #4338ca;
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .logo svg { width: 32px; height: 32px; }
+    .logo-name {
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.3px;
+    }
+    .logo-badge {
+      background: #6ee7b7;
+      color: #064e3b;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      margin-left: 4px;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .user-email {
+      color: rgba(255,255,255,0.75);
+      font-size: 13px;
+    }
+    .btn-logout {
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,0.25); }
+    main {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      font-size: 15px;
+      color: #6b7280;
+    }
+    .content { display: none; }
+    .welcome {
+      font-size: 26px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #6b7280;
+      font-size: 15px;
+      margin-bottom: 36px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/testing/seminar.html" class="logo">
+      <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M6 38 C6 38 14 16 23 26 C32 36 40 14 48 14"
+              stroke="white" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <span class="logo-name">Fincent</span>
+      <span class="logo-badge">AI</span>
+    </a>
+    <div class="header-right">
+      <span class="user-email" id="user-email"></span>
+      <button class="btn-logout" onclick="logout()">Uitloggen</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="loading" id="loading">Authenticatie controleren…</div>
+    <div class="content" id="content">
+      <div class="welcome" id="welcome">Goedendag 👋</div>
+      <p class="subtitle">Welkom op de Fincent AI-pagina.</p>
+    </div>
+  </main>
+
+  <script>
+    const WORKER = (localStorage.getItem('seminar-worker-url') || '').replace(/\/$/, '');
+
+    function getToken() {
+      return localStorage.getItem('ai_token') || sessionStorage.getItem('ai_token');
+    }
+
+    function getEmail() {
+      return localStorage.getItem('ai_email') || sessionStorage.getItem('ai_email');
+    }
+
+    function logout() {
+      localStorage.removeItem('ai_token');
+      localStorage.removeItem('ai_email');
+      sessionStorage.removeItem('ai_token');
+      sessionStorage.removeItem('ai_email');
+      window.location.href = '/testing/login.html';
+    }
+
+    async function checkAuth() {
+      const token = getToken();
+      if (!token || !WORKER) {
+        window.location.href = '/testing/login.html';
+        return;
+      }
+      try {
+        const res = await fetch(`${WORKER}/verify`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          window.location.href = '/testing/login.html';
+          return;
+        }
+        const { email } = await res.json();
+        document.getElementById('user-email').textContent = email;
+        const name = email.split('@')[0];
+        document.getElementById('welcome').textContent = `Goedendag, ${name} 👋`;
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+      } catch {
+        window.location.href = '/testing/login.html';
+      }
+    }
+
+    checkAuth();
+  </script>
+</body>
+</html>
